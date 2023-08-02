@@ -10,7 +10,7 @@ impl BTree {
         BTree {
             root: Node::new(0),
             nb_blocks: nb_blocks_,
-            height: nb_blocks_.ilog2() + 1,
+            height: nb_blocks_.ilog2(), // todo rounding down bad
             block_size: block_size_,
         }
     }
@@ -23,7 +23,8 @@ impl BTree {
     }
 
     fn complete_tree(max_height: u32, height: u32, node: &mut Node) {
-        if height < max_height {
+        // -1 is to avoid constructing 1 extra level.
+        if height < max_height - 1 {
             let mut left = Box::new(Node::new(height));
             let mut right = Box::new(Node::new(height));
 
@@ -55,12 +56,12 @@ impl Node {
         }
     }
 
-    pub fn left(self) -> Node {
-        *self.left.unwrap()
+    pub fn left(self) -> Option<Box<Node>> {
+        self.left
     }
 
-    pub fn right(self) -> Node {
-        *self.right.unwrap()
+    pub fn right(self) -> Option<Box<Node>> {
+        self.right
     }
 
     pub fn get_value(self) -> u32 {

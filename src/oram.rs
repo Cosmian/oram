@@ -45,3 +45,15 @@ impl ORAM {
     //    self.stash
     //}
 }
+
+pub fn path_traversal(node: Option<Box<btree::Node>>, path: u16) {
+    if let Some(node) = node {
+        if path % 2 == 0 {
+            path_traversal((*node).left(), path / 2);
+            println!("left");
+        } else {
+            path_traversal((*node).right(), path / 2);
+            println!("right");
+        }
+    }
+}
