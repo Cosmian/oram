@@ -1,0 +1,5 @@
+# Build dir
+/target
+
+# Auto save files
+*~
