@@ -46,14 +46,15 @@ impl ORAM {
     //}
 }
 
-pub fn path_traversal(node: Option<Box<btree::Node>>, path: u16) {
+pub fn path_traversal(node: Option<Box<btree::Node>>, path: u16, level: u32) {
     if let Some(node) = node {
-        if path % 2 == 0 {
-            path_traversal((*node).left(), path / 2);
+        // Left-to-right bitwise analysis.
+        if (path >> (level - 1)) % 2 == 0 {
             println!("left");
+            path_traversal((*node).left(), path, level - 1);
         } else {
-            path_traversal((*node).right(), path / 2);
             println!("right");
+            path_traversal((*node).right(), path, level - 1);
         }
     }
 }

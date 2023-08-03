@@ -5,8 +5,9 @@ fn main() {
     let path_oram = oram::ORAM::new(128, 32, 32);
     println!("Hello Path-ORAM!");
 
-    let path = 77;
-    oram::path_traversal(Some(Box::new(path_oram.get_tree().get_root())), path);
+    let path = 49;
+    //let height = &path_oram.get_tree().height();
+    oram::path_traversal(Some(Box::new(path_oram.get_tree().root())), path, 7);
 }
 
 #[cfg(test)]

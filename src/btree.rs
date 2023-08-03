@@ -36,8 +36,12 @@ impl BTree {
         }
     }
 
-    pub fn get_root(self) -> Node {
+    pub fn root(self) -> Node {
         self.root
+    }
+
+    pub fn height(self) -> u32 {
+        self.height
     }
 }
 
