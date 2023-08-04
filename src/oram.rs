@@ -1,60 +1,64 @@
-use crate::btree;
+use crate::btree::{BTree, Node};
 
-struct Stash {
-    size: u32,
+#[derive(Debug, Default, Clone)]
+pub struct Stash {
     stash: Vec<u32>,
 }
 
 impl Stash {
-    fn new(size_: u32) -> Stash {
+    pub fn new(size: usize) -> Stash {
         Stash {
-            size: size_,
-            stash: vec![0; size_.try_into().unwrap()],
+            stash: vec![0; size],
         }
+    }
+
+    pub fn stash(&self) -> &Vec<u32> {
+        &self.stash
     }
 }
 
 pub struct ORAM {
-    tree: btree::BTree,
+    tree: BTree,
     stash: Stash,
-    nb_blocks: u64,
-    stash_size: u32,
-    block_size: u16,
 }
 
 impl ORAM {
-    pub fn new(nb_blocks_: u64, stash_size_: u32, block_size_: u16) -> ORAM {
+    pub fn new(stash: Stash, nb_blocks: usize, block_size: usize) -> ORAM {
         ORAM {
-            tree: btree::BTree::new_empty_complete(nb_blocks_, block_size_),
-            stash: Stash::new(stash_size_),
-            nb_blocks: nb_blocks_,
-            stash_size: stash_size_,
-            block_size: block_size_,
+            tree: BTree::new_empty_complete(nb_blocks, block_size),
+            stash,
         }
     }
 
-    pub fn get_nb_blocks(self) -> u64 {
-        self.nb_blocks
+    pub fn read_path(&self, path: u16) -> Vec<u32> {
+        let mut path_values = Vec::new();
+
+        ORAM::path_traversal(self.tree.root(), &mut path_values, path, self.tree.height());
+
+        path_values.extend_from_slice(self.stash.stash());
+        path_values
     }
 
-    pub fn get_tree(self) -> btree::BTree {
-        self.tree
-    }
+    fn path_traversal(node: Option<&Box<Node>>, path_values: &mut Vec<u32>, path: u16, level: u32) {
+        if let Some(node) = node {
+            path_values.push(node.value());
 
-    //pub fn get_stash(self) -> Stash {
-    //    self.stash
-    //}
-}
-
-pub fn path_traversal(node: Option<Box<btree::Node>>, path: u16, level: u32) {
-    if let Some(node) = node {
-        // Left-to-right bitwise analysis.
-        if (path >> (level - 1)) % 2 == 0 {
-            println!("left");
-            path_traversal((*node).left(), path, level - 1);
-        } else {
-            println!("right");
-            path_traversal((*node).right(), path, level - 1);
+            // Left-to-right bitwise analysis.
+            if (path >> (level - 1)) % 2 == 0 {
+                println!("left");
+                ORAM::path_traversal(node.left(), path_values, path, level - 1);
+            } else {
+                println!("right");
+                ORAM::path_traversal(node.right(), path_values, path, level - 1);
+            }
         }
+    }
+
+    pub fn tree(&self) -> &BTree {
+        &self.tree
+    }
+
+    pub fn stash(&self) -> &Stash {
+        &self.stash
     }
 }

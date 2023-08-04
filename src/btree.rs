@@ -1,50 +1,64 @@
+#[derive(Debug, Clone, Default)]
 pub struct BTree {
-    root: Node,
-    nb_blocks: u64,
+    root: Option<Box<Node>>,
+    nb_blocks: usize,
+    block_size: usize,
     height: u32,
-    block_size: u16,
 }
 
 impl BTree {
-    pub fn new(nb_blocks_: u64, block_size_: u16) -> BTree {
-        BTree {
-            root: Node::new(0),
-            nb_blocks: nb_blocks_,
-            height: nb_blocks_.ilog2(), // todo rounding down bad
-            block_size: block_size_,
+    pub fn new_empty_complete(nb_blocks: usize, block_size: usize) -> BTree {
+        let mut height = nb_blocks.ilog2();
+        if !nb_blocks.is_power_of_two() {
+            height += 1;
         }
-    }
 
-    pub fn new_empty_complete(nb_blocks_: u64, block_size_: u16) -> BTree {
-        let mut tree = BTree::new(nb_blocks_, block_size_);
+        let mut tree = BTree {
+            root: Option::None,
+            nb_blocks,
+            height,
+            block_size,
+        };
 
-        BTree::complete_tree(tree.height, 0, &mut tree.root);
+        let mut root = Node::default();
+
+        BTree::complete_tree(&mut root, tree.height, 0);
+        tree.root = Some(Box::new(root));
         tree
     }
 
-    fn complete_tree(max_height: u32, height: u32, node: &mut Node) {
+    fn complete_tree(node: &mut Node, height: u32, level: u32) {
         // -1 is to avoid constructing 1 extra level.
-        if height < max_height - 1 {
-            let mut left = Box::new(Node::new(height));
-            let mut right = Box::new(Node::new(height));
+        if level < height - 1 {
+            let mut left = Box::new(Node::new(level + 1));
+            let mut right = Box::new(Node::new(level + 1));
 
-            BTree::complete_tree(max_height, height + 1, &mut left);
-            BTree::complete_tree(max_height, height + 1, &mut right);
+            BTree::complete_tree(&mut left, height, level + 1);
+            BTree::complete_tree(&mut right, height, level + 1);
 
             node.left = Some(left);
             node.right = Some(right);
         }
     }
 
-    pub fn root(self) -> Node {
-        self.root
+    pub fn root(&self) -> Option<&Box<Node>> {
+        self.root.as_ref()
     }
 
-    pub fn height(self) -> u32 {
+    pub fn nb_blocks(&self) -> usize {
+        self.nb_blocks
+    }
+
+    pub fn block_size(&self) -> usize {
+        self.block_size
+    }
+
+    pub fn height(&self) -> u32 {
         self.height
     }
 }
 
+#[derive(Debug, Clone, Default)]
 pub struct Node {
     left: Option<Box<Node>>,
     right: Option<Box<Node>>,
@@ -52,23 +66,23 @@ pub struct Node {
 }
 
 impl Node {
-    fn new(value_: u32) -> Node {
+    fn new(value: u32) -> Node {
         Node {
             left: Option::None,
             right: Option::None,
-            value: value_,
+            value,
         }
     }
 
-    pub fn left(self) -> Option<Box<Node>> {
-        self.left
+    pub fn left(&self) -> Option<&Box<Node>> {
+        self.left.as_ref()
     }
 
-    pub fn right(self) -> Option<Box<Node>> {
-        self.right
+    pub fn right(&self) -> Option<&Box<Node>> {
+        self.right.as_ref()
     }
 
-    pub fn get_value(self) -> u32 {
+    pub fn value(&self) -> u32 {
         self.value
     }
 }
