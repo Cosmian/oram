@@ -1,17 +1,16 @@
-use cosmian_crypto_core::reexport::rand_core::CryptoRngCore;
-
 use crate::oram::BUCKET_SIZE;
+use cosmian_crypto_core::reexport::rand_core::CryptoRngCore;
 
 #[derive(Debug, Clone, Default)]
 pub struct BTree {
-    root: Option<Box<Node>>,
+    pub root: Option<Box<Node>>,
     nb_blocks: usize,
     block_size: usize,
     height: u32,
 }
 
 impl BTree {
-    pub fn new_empty_complete<CSPRNG: CryptoRngCore>(
+    pub fn new_random_complete<CSPRNG: CryptoRngCore>(
         csprng: &mut CSPRNG,
         nb_blocks: usize,
         block_size: usize,
@@ -43,7 +42,7 @@ impl BTree {
     ) {
         // -1 is to avoid constructing 1 extra level.
         if level < height - 1 {
-            let mut left = Box::new(Node::new(csprng));
+            let mut left: Box<Node> = Box::new(Node::new(csprng));
             let mut right = Box::new(Node::new(csprng));
 
             BTree::complete_tree(csprng, &mut left, height, level + 1);
@@ -52,10 +51,6 @@ impl BTree {
             node.left = Some(left);
             node.right = Some(right);
         }
-    }
-
-    pub fn root(&self) -> Option<&Box<Node>> {
-        self.root.as_ref()
     }
 
     pub fn nb_blocks(&self) -> usize {
@@ -74,8 +69,8 @@ impl BTree {
 /* Bucket ciphertexts are not size bounded. Might want to fix this later. */
 #[derive(Debug, Clone, Default)]
 pub struct Node {
-    left: Option<Box<Node>>,
-    right: Option<Box<Node>>,
+    pub left: Option<Box<Node>>,
+    pub right: Option<Box<Node>>,
     bucket: [DataItem; BUCKET_SIZE],
 }
 
@@ -95,16 +90,12 @@ impl Node {
         }
     }
 
-    pub fn left(&self) -> Option<&Box<Node>> {
-        self.left.as_ref()
-    }
-
-    pub fn right(&self) -> Option<&Box<Node>> {
-        self.right.as_ref()
-    }
-
     pub fn bucket(&self) -> &[DataItem; BUCKET_SIZE] {
         &self.bucket
+    }
+
+    pub fn set_bucket_element(&mut self, elt: DataItem, i: usize) {
+        self.bucket[i] = elt;
     }
 }
 
@@ -115,7 +106,7 @@ pub struct DataItem {
 }
 
 impl DataItem {
-    fn new(data: Vec<u8>, path: u16) -> DataItem {
+    pub fn new(data: Vec<u8>, path: u16) -> DataItem {
         DataItem { data, path }
     }
 
@@ -130,15 +121,7 @@ impl DataItem {
         &self.data
     }
 
-    pub fn set_data(&mut self, data: Vec<u8>) {
-        self.data = data;
-    }
-
     pub fn path(&self) -> u16 {
         self.path
-    }
-
-    pub fn set_path(&mut self, path: u16) {
-        self.path = path;
     }
 }
