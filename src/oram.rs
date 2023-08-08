@@ -77,9 +77,7 @@ impl ORAM {
                 Some([path_data, self.stash.to_vec()].concat())
             }
             AccessType::Write => {
-                // TODO
                 if let Some(data) = data {
-                    // XXX - TODO - OUCH FIXMEEEEEE.
                     let tree_height = self.tree.height();
                     ORAM::write_path(
                         self.tree.root.as_mut(),
@@ -103,10 +101,7 @@ impl ORAM {
         // Check if not out of the binary tree.
         if let Some(node) = node {
             node.bucket().iter().for_each(|data_item| {
-                // Only add the element if it belongs to our path.
-                if data_item.path() == path {
-                    path_data.push(data_item.data().to_vec());
-                }
+                path_data.push(data_item.data().to_vec());
             });
 
             // Left-to-right bitwise analysis.
@@ -175,9 +170,67 @@ impl ORAM {
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        btree::Node,
+        oram::{AccessType, Stash, BUCKET_SIZE, ORAM},
+    };
+
+    fn _complete_tree_size(node: Option<&Box<Node>>) -> usize {
+        if let Some(node) = node {
+            return _complete_tree_size(node.left.as_ref())
+                + _complete_tree_size(node.right.as_ref());
+        }
+
+        1
+    }
 
     #[test]
-    fn complete_tree_test_values() {
-        assert_eq!(1, 1);
+    fn complete_tree_size() {
+        let nb_blocks = 128;
+        let block_size = 32;
+        let stash = Stash::new();
+        let path_oram = ORAM::new(stash, nb_blocks, block_size);
+
+        let tree_size = _complete_tree_size(path_oram.tree().root.as_ref());
+
+        assert_eq!(tree_size, nb_blocks);
+    }
+
+    #[test]
+    fn access_read_size_result() {
+        let nb_blocks = 128;
+        let block_size = 32;
+        let stash = Stash::new();
+        let mut path_oram = ORAM::new(stash, nb_blocks, block_size);
+
+        let path = 49;
+        let path_values =
+            path_oram.access(AccessType::Read, path, Option::None);
+
+        assert!(path_values.is_some());
+        assert_eq!(
+            path_values.unwrap().len(),
+            (path_oram.tree().height() as usize * BUCKET_SIZE)
+        )
+    }
+
+    #[test]
+    fn bucket_element_ciphertext_size() {
+        let nb_blocks = 128;
+        let block_size = 32;
+        let stash = Stash::new();
+        let path_oram = ORAM::new(stash, nb_blocks, block_size);
+
+        assert!(path_oram.tree().root.is_some());
+        path_oram
+            .tree()
+            .root
+            .as_ref()
+            .unwrap()
+            .bucket()
+            .iter()
+            .for_each(|data_item| {
+                assert_eq!(data_item.data().len(), block_size);
+            });
     }
 }

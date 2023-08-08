@@ -5,7 +5,7 @@ mod oram;
 
 fn main() {
     let nb_blocks = 128;
-    let block_size = 64;
+    let block_size = 32;
     let stash = Stash::new();
     let mut path_oram = ORAM::new(stash, nb_blocks, block_size);
     println!("Hello, Path-ORAM!");

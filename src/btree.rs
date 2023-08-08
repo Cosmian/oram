@@ -5,7 +5,7 @@ use cosmian_crypto_core::reexport::rand_core::CryptoRngCore;
 pub struct BTree {
     pub root: Option<Box<Node>>,
     nb_blocks: usize,
-    block_size: usize,
+    block_bytes_size: usize,
     height: u32,
 }
 
@@ -13,7 +13,7 @@ impl BTree {
     pub fn new_random_complete<CSPRNG: CryptoRngCore>(
         csprng: &mut CSPRNG,
         nb_blocks: usize,
-        block_size: usize,
+        block_bytes_size: usize,
     ) -> BTree {
         let mut height = nb_blocks.ilog2();
         if !nb_blocks.is_power_of_two() {
@@ -24,12 +24,18 @@ impl BTree {
             root: Option::None,
             nb_blocks,
             height,
-            block_size,
+            block_bytes_size,
         };
 
-        let mut root = Node::new(csprng);
+        let mut root = Node::new(csprng, block_bytes_size);
 
-        BTree::complete_tree(csprng, &mut root, tree.height, 0);
+        BTree::complete_tree(
+            csprng,
+            &mut root,
+            tree.height,
+            0,
+            block_bytes_size,
+        );
         tree.root = Some(Box::new(root));
         tree
     }
@@ -39,14 +45,28 @@ impl BTree {
         node: &mut Node,
         height: u32,
         level: u32,
+        block_bytes_size: usize,
     ) {
         // -1 is to avoid constructing 1 extra level.
         if level < height - 1 {
-            let mut left: Box<Node> = Box::new(Node::new(csprng));
-            let mut right = Box::new(Node::new(csprng));
+            let mut left: Box<Node> =
+                Box::new(Node::new(csprng, block_bytes_size));
+            let mut right = Box::new(Node::new(csprng, block_bytes_size));
 
-            BTree::complete_tree(csprng, &mut left, height, level + 1);
-            BTree::complete_tree(csprng, &mut right, height, level + 1);
+            BTree::complete_tree(
+                csprng,
+                &mut left,
+                height,
+                level + 1,
+                block_bytes_size,
+            );
+            BTree::complete_tree(
+                csprng,
+                &mut right,
+                height,
+                level + 1,
+                block_bytes_size,
+            );
 
             node.left = Some(left);
             node.right = Some(right);
@@ -57,8 +77,8 @@ impl BTree {
         self.nb_blocks
     }
 
-    pub fn block_size(&self) -> usize {
-        self.block_size
+    pub fn block_bytes_size(&self) -> usize {
+        self.block_bytes_size
     }
 
     pub fn height(&self) -> u32 {
@@ -75,12 +95,15 @@ pub struct Node {
 }
 
 impl Node {
-    fn new<CSPRNG: CryptoRngCore>(csprng: &mut CSPRNG) -> Node {
+    fn new<CSPRNG: CryptoRngCore>(
+        csprng: &mut CSPRNG,
+        block_bytes_size: usize,
+    ) -> Node {
         let bucket = [
-            DataItem::new_random(csprng),
-            DataItem::new_random(csprng),
-            DataItem::new_random(csprng),
-            DataItem::new_random(csprng),
+            DataItem::new_random(csprng, block_bytes_size),
+            DataItem::new_random(csprng, block_bytes_size),
+            DataItem::new_random(csprng, block_bytes_size),
+            DataItem::new_random(csprng, block_bytes_size),
         ];
 
         Node {
@@ -110,10 +133,14 @@ impl DataItem {
         DataItem { data, path }
     }
 
-    fn new_random<CSPRNG: CryptoRngCore>(csprng: &mut CSPRNG) -> DataItem {
-        let mut data = vec![0; 16];
+    fn new_random<CSPRNG: CryptoRngCore>(
+        csprng: &mut CSPRNG,
+        block_bytes_size: usize,
+    ) -> DataItem {
+        let mut data = vec![0; block_bytes_size];
         csprng.fill_bytes(&mut data);
 
+        // XXX - Not oblivious to put all with path 0: can distinguish dummies.
         DataItem { data, path: 0 }
     }
 
