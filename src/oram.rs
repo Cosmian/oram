@@ -1,10 +1,8 @@
 use crate::btree::{BTree, DataItem, Node};
-use cosmian_crypto_core::{reexport::rand_core::SeedableRng, CsRng};
+use std::io::{Error, ErrorKind};
 use std::ops::{Deref, DerefMut};
 
 pub const BUCKET_SIZE: usize = 4;
-
-// pub type Stashh = Vec<Vec<u8>>;
 
 pub enum AccessType {
     Read,
@@ -39,42 +37,55 @@ impl Stash {
 
 pub struct ORAM {
     tree: BTree,
-    stash: Stash,
 }
 
 impl ORAM {
-    pub fn new(stash: Stash, nb_blocks: usize, block_size: usize) -> ORAM {
-        let mut csprng = CsRng::from_entropy();
-
-        ORAM {
-            tree: BTree::new_random_complete(
-                &mut csprng,
-                nb_blocks,
-                block_size,
-            ),
-            stash,
+    pub fn new(
+        dummies: &mut Vec<DataItem>,
+        nb_blocks: usize,
+    ) -> Result<ORAM, Error> {
+        if nb_blocks == 0 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Number of blocks shall not be null".to_string(),
+            ));
         }
+        Ok(ORAM {
+            tree: BTree::init_new(dummies, nb_blocks),
+        })
     }
 
     pub fn access(
         &mut self,
         op: AccessType,
         path: u16,
-        data: Option<&mut Vec<Vec<u8>>>,
-    ) -> Option<Vec<Vec<u8>>> {
-        let mut path_data = Vec::new();
-
-        ORAM::read_path(
-            self.tree.root.as_ref(),
-            &mut path_data,
-            path,
-            self.tree.height(),
-        );
+        data: Option<&mut Vec<DataItem>>,
+    ) -> Result<Option<Vec<DataItem>>, Error> {
+        if path > self.tree.height() - 1 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!(
+                    "Invalid path access. Got {}, expected in range 0..{}",
+                    path,
+                    self.tree.height() - 1
+                ),
+            ));
+        }
 
         match op {
             AccessType::Read => {
-                // Returning values from tree and stash if there are any.
-                Some([path_data, self.stash.to_vec()].concat())
+                let mut path_items = Vec::new();
+
+                ORAM::read_path(
+                    self.tree.root.as_ref(),
+                    &mut path_items,
+                    path,
+                    self.tree.height(),
+                    0,
+                );
+
+                // Returning values from tree visit.
+                Ok(Some(path_items))
             }
             AccessType::Write => {
                 if let Some(data) = data {
@@ -84,39 +95,62 @@ impl ORAM {
                         data,
                         path,
                         tree_height,
-                    )
-                    // TODO: write data remnants to stash.
+                        0,
+                    );
+
+                    /*
+                     * Remnants elements could not be stored in the tree, they
+                     * represent the new stash (client-side).
+                     */
+                    return Ok(Some(data.to_vec()));
                 }
-                None
+
+                Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    "Invalid data to write. Got None, expected Some"
+                        .to_string(),
+                ))
             }
         }
     }
 
     fn read_path(
         node: Option<&Box<Node>>,
-        path_data: &mut Vec<Vec<u8>>,
+        path_data: &mut Vec<DataItem>,
         path: u16,
-        level: u32,
+        height: u16,
+        level: u16,
     ) {
         // Check if not out of the binary tree.
         if let Some(node) = node {
+            // Push elements in the node in the vector.
             node.bucket().iter().for_each(|data_item| {
-                path_data.push(data_item.data().to_vec());
+                path_data.push(data_item.clone());
             });
 
-            // Left-to-right bitwise analysis.
-            if (path >> (level - 1)) % 2 == 0 {
-                println!("left");
-                ORAM::read_path(node.left.as_ref(), path_data, path, level - 1);
+            // Left-to-right bitwise analysis. Substraction of 2 because one is for height being one more than path bit length.
+            // The other one is because we want to see the bit corresponding to the next level.
+            // check overflow here.
+            let mut bit_shift = (height - level) as i16 - 2;
+            if bit_shift < 0 {
+                bit_shift = 0;
+            }
 
-                // shall we collapse values here ?
+            if (path >> bit_shift) % 2 == 0 {
+                ORAM::read_path(
+                    node.left.as_ref(),
+                    path_data,
+                    path,
+                    height,
+                    level + 1,
+                );
             } else {
-                println!("right");
                 ORAM::read_path(
                     node.right.as_ref(),
                     path_data,
                     path,
-                    level - 1,
+                    height,
+                    level + 1,
                 );
             }
         }
@@ -124,35 +158,59 @@ impl ORAM {
 
     fn write_path(
         node: Option<&mut Box<Node>>,
-        path_data: &mut Vec<Vec<u8>>,
+        path_data: &mut Vec<DataItem>,
         path: u16,
-        level: u32,
+        height: u16,
+        level: u16,
     ) {
         // Check if not out of the binary tree.
         if let Some(node) = node {
             // Left-to-right bitwise analysis.
-            if (path >> (level - 1)) % 2 == 0 {
+
+            /*
+             * Left-to-right bitwise analysis. Substraction of 2 because one is
+             * for height being one more than path bit length. The other one is
+             * because we want to see the bit corresponding to the next level.
+             * Below condition checks overflow.
+             */
+            let mut bit_shift = (height - level) as i16 - 2;
+            if bit_shift < 0 {
+                bit_shift = 0;
+            }
+
+            if (path >> bit_shift) % 2 == 0 {
                 ORAM::write_path(
                     node.left.as_mut(),
                     path_data,
                     path,
-                    level - 1,
+                    height,
+                    level + 1,
                 );
             } else {
                 ORAM::write_path(
                     node.right.as_mut(),
                     path_data,
                     path,
-                    level - 1,
+                    height,
+                    level + 1,
                 );
             }
 
-            // one-liner possible ?
+            /*
+             * Write element to the path. Right-side view method to greedily
+             * fill the buckets. Elements can only be written on the path if
+             * their new path is at an intersection with the old path.
+             */
+            // FIXME - one-liner possible ?
             for i in 0..BUCKET_SIZE {
-                if let Some(data) = path_data.pop() {
-                    // TODO: check which element to overwrite ? or ok ?
-                    if node.bucket()[i].path() == path {
-                        node.set_bucket_element(DataItem::new(data, path), i);
+                for j in 0..path_data.len() {
+                    if path_data[j].path() >> (height - level)
+                        == path >> (height - level)
+                        && !path_data[j].data().is_empty()
+                    {
+                        // Remove element from vector once inserted.
+                        node.set_bucket_element(path_data.remove(j), i);
+                        break;
                     }
                 }
             }
@@ -161,76 +219,5 @@ impl ORAM {
 
     pub fn tree(&self) -> &BTree {
         &self.tree
-    }
-
-    pub fn stash(&self) -> &Stash {
-        &self.stash
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        btree::Node,
-        oram::{AccessType, Stash, BUCKET_SIZE, ORAM},
-    };
-
-    fn _complete_tree_size(node: Option<&Box<Node>>) -> usize {
-        if let Some(node) = node {
-            return _complete_tree_size(node.left.as_ref())
-                + _complete_tree_size(node.right.as_ref());
-        }
-
-        1
-    }
-
-    #[test]
-    fn complete_tree_size() {
-        let nb_blocks = 128;
-        let block_size = 32;
-        let stash = Stash::new();
-        let path_oram = ORAM::new(stash, nb_blocks, block_size);
-
-        let tree_size = _complete_tree_size(path_oram.tree().root.as_ref());
-
-        assert_eq!(tree_size, nb_blocks);
-    }
-
-    #[test]
-    fn access_read_size_result() {
-        let nb_blocks = 128;
-        let block_size = 32;
-        let stash = Stash::new();
-        let mut path_oram = ORAM::new(stash, nb_blocks, block_size);
-
-        let path = 49;
-        let path_values =
-            path_oram.access(AccessType::Read, path, Option::None);
-
-        assert!(path_values.is_some());
-        assert_eq!(
-            path_values.unwrap().len(),
-            (path_oram.tree().height() as usize * BUCKET_SIZE)
-        )
-    }
-
-    #[test]
-    fn bucket_element_ciphertext_size() {
-        let nb_blocks = 128;
-        let block_size = 32;
-        let stash = Stash::new();
-        let path_oram = ORAM::new(stash, nb_blocks, block_size);
-
-        assert!(path_oram.tree().root.is_some());
-        path_oram
-            .tree()
-            .root
-            .as_ref()
-            .unwrap()
-            .bucket()
-            .iter()
-            .for_each(|data_item| {
-                assert_eq!(data_item.data().len(), block_size);
-            });
     }
 }

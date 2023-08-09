@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 cosmian_crypto_core = {version="9.0.1",default-features=false}
+rand = "0.8.5"

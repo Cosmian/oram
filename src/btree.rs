@@ -1,75 +1,63 @@
 use crate::oram::BUCKET_SIZE;
-use cosmian_crypto_core::reexport::rand_core::CryptoRngCore;
 
 #[derive(Debug, Clone, Default)]
 pub struct BTree {
-    pub root: Option<Box<Node>>,
+    pub(super) root: Option<Box<Node>>,
     nb_blocks: usize,
-    block_bytes_size: usize,
-    height: u32,
+    height: u16,
 }
 
 impl BTree {
-    pub fn new_random_complete<CSPRNG: CryptoRngCore>(
-        csprng: &mut CSPRNG,
-        nb_blocks: usize,
-        block_bytes_size: usize,
-    ) -> BTree {
-        let mut height = nb_blocks.ilog2();
-        if !nb_blocks.is_power_of_two() {
-            height += 1;
-        }
-
+    pub fn init_new(dummies: &mut Vec<DataItem>, nb_blocks: usize) -> BTree {
         let mut tree = BTree {
             root: Option::None,
             nb_blocks,
-            height,
-            block_bytes_size,
+            height: nb_blocks.ilog2() as u16 + 1,
         };
 
-        let mut root = Node::new(csprng, block_bytes_size);
+        let path = 0;
+        let mut root = Node::new();
 
-        BTree::complete_tree(
-            csprng,
-            &mut root,
-            tree.height,
-            0,
-            block_bytes_size,
-        );
+        tree.complete_tree(&mut root, dummies, path, 0);
         tree.root = Some(Box::new(root));
+
         tree
     }
 
-    fn complete_tree<CSPRNG: CryptoRngCore>(
-        csprng: &mut CSPRNG,
+    fn complete_tree(
+        &self,
         node: &mut Node,
-        height: u32,
-        level: u32,
-        block_bytes_size: usize,
+        dummies: &mut Vec<DataItem>,
+        path: u16,
+        level: u16,
     ) {
         // -1 is to avoid constructing 1 extra level.
-        if level < height - 1 {
-            let mut left: Box<Node> =
-                Box::new(Node::new(csprng, block_bytes_size));
-            let mut right = Box::new(Node::new(csprng, block_bytes_size));
+        if level < self.height - 1 {
+            let mut left: Box<Node> = Box::new(Node::new());
+            let mut right = Box::new(Node::new());
 
-            BTree::complete_tree(
-                csprng,
-                &mut left,
-                height,
-                level + 1,
-                block_bytes_size,
-            );
-            BTree::complete_tree(
-                csprng,
-                &mut right,
-                height,
-                level + 1,
-                block_bytes_size,
-            );
+            self.complete_tree(&mut left, dummies, path * 2, level + 1);
+            self.complete_tree(&mut right, dummies, path * 2 + 1, level + 1);
 
             node.left = Some(left);
             node.right = Some(right);
+        }
+
+        /*
+         * Greedily filling buckets following a right side visit to fill leaves
+         * first.
+         */
+        for i in 0..BUCKET_SIZE {
+            for j in 0..dummies.len() {
+                /* At this point path is only `level` bits long. We compare the
+                 * MSB of the path of the element to insert to see if the path
+                 * is at an intersection with the current visit of the tree.
+                 */
+                if dummies[j].path() >> (self.height - level - 1) == path {
+                    node.set_bucket_element(dummies.remove(j), i);
+                    break;
+                }
+            }
         }
     }
 
@@ -77,39 +65,29 @@ impl BTree {
         self.nb_blocks
     }
 
-    pub fn block_bytes_size(&self) -> usize {
-        self.block_bytes_size
-    }
-
-    pub fn height(&self) -> u32 {
+    pub fn height(&self) -> u16 {
         self.height
     }
 }
 
-/* Bucket ciphertexts are not size bounded. Might want to fix this later. */
 #[derive(Debug, Clone, Default)]
 pub struct Node {
-    pub left: Option<Box<Node>>,
-    pub right: Option<Box<Node>>,
+    pub(crate) left: Option<Box<Node>>,
+    pub(crate) right: Option<Box<Node>>,
     bucket: [DataItem; BUCKET_SIZE],
 }
 
 impl Node {
-    fn new<CSPRNG: CryptoRngCore>(
-        csprng: &mut CSPRNG,
-        block_bytes_size: usize,
-    ) -> Node {
-        let bucket = [
-            DataItem::new_random(csprng, block_bytes_size),
-            DataItem::new_random(csprng, block_bytes_size),
-            DataItem::new_random(csprng, block_bytes_size),
-            DataItem::new_random(csprng, block_bytes_size),
-        ];
-
+    fn new() -> Node {
         Node {
             left: Option::None,
             right: Option::None,
-            bucket,
+            bucket: [
+                DataItem::new(Vec::new(), 0),
+                DataItem::new(Vec::new(), 0),
+                DataItem::new(Vec::new(), 0),
+                DataItem::new(Vec::new(), 0),
+            ],
         }
     }
 
@@ -133,22 +111,19 @@ impl DataItem {
         DataItem { data, path }
     }
 
-    fn new_random<CSPRNG: CryptoRngCore>(
-        csprng: &mut CSPRNG,
-        block_bytes_size: usize,
-    ) -> DataItem {
-        let mut data = vec![0; block_bytes_size];
-        csprng.fill_bytes(&mut data);
-
-        // XXX - Not oblivious to put all with path 0: can distinguish dummies.
-        DataItem { data, path: 0 }
-    }
-
     pub fn data(&self) -> &Vec<u8> {
         &self.data
     }
 
     pub fn path(&self) -> u16 {
         self.path
+    }
+
+    pub fn set_data(&mut self, data: Vec<u8>) {
+        self.data = data;
+    }
+
+    pub fn set_path(&mut self, path: u16) {
+        self.path = path;
     }
 }
