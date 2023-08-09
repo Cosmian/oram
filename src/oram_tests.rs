@@ -205,6 +205,13 @@ mod tests {
         let stash = path_values_opt.unwrap();
 
         // Path-Oram success.
-        assert!(stash.len() < path_oram.tree().height() as usize);
+        assert!(
+            stash
+                .iter()
+                .filter(|remnant| !remnant.data().is_empty())
+                .collect::<Vec<_>>()
+                .len()
+                < path_oram.tree().height() as usize
+        );
     }
 }
