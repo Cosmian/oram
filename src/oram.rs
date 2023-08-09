@@ -61,7 +61,7 @@ impl ORAM {
         path: u16,
         data: Option<&mut Vec<DataItem>>,
     ) -> Result<Option<Vec<DataItem>>, Error> {
-        if path > self.tree.height() - 1 {
+        if path > (1 << (self.tree.height() - 1)) - 1 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
                 format!(
