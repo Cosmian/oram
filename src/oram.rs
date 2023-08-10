@@ -1,38 +1,11 @@
 use crate::btree::{BTree, DataItem, Node};
 use std::io::{Error, ErrorKind};
-use std::ops::{Deref, DerefMut};
 
 pub const BUCKET_SIZE: usize = 4;
 
 pub enum AccessType {
     Read,
     Write,
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct Stash {
-    stash: Vec<Vec<u8>>,
-}
-
-impl Deref for Stash {
-    type Target = [Vec<u8>];
-
-    fn deref(&self) -> &Self::Target {
-        &self.stash
-    }
-}
-
-impl DerefMut for Stash {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.stash
-    }
-}
-
-impl Stash {
-    pub fn new() -> Stash {
-        // Empty stash at initialization.
-        Stash { stash: Vec::new() }
-    }
 }
 
 pub struct ORAM {

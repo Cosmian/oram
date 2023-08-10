@@ -3,9 +3,9 @@ mod tests {
     use rand::Rng;
 
     use crate::{
-        btree::{DataItem, Node},
+        btree::Node,
+        client::ClientORAM,
         oram::{AccessType, BUCKET_SIZE, ORAM},
-        CIPHERTEXTS,
     };
 
     fn _complete_tree_size(node: Option<&Box<Node>>) -> usize {
@@ -170,13 +170,19 @@ mod tests {
 
         let nb_blocks: usize = 15;
         let nb_leaves = (1 << (nb_blocks.ilog2() + 1)) / 2;
+        let block_size: usize = 16;
 
-        let mut dummies = Vec::new();
-        for ct in CIPHERTEXTS[0..nb_blocks * BUCKET_SIZE].to_vec() {
-            dummies
-                .push(DataItem::new(ct.to_vec(), rng.gen_range(0..nb_leaves)));
-        }
+        let mut client = ClientORAM::new();
+        client.gen_key();
 
+        let dummies_result = client.generate_dummies(nb_blocks, block_size);
+
+        assert!(dummies_result.is_ok());
+        let mut dummies = dummies_result.unwrap();
+
+        /*
+         * Server.
+         */
         let res_oram = ORAM::new(&mut dummies, nb_blocks);
 
         assert!(res_oram.is_ok());
@@ -192,11 +198,12 @@ mod tests {
         let mut path_values = path_values_opt.unwrap();
 
         // Change block 6.
-        let block_change = 6;
-
-        path_values[block_change]
-            .set_data([21, 188, 234, 210, 25, 251, 146, 34].to_vec());
-        path_values[block_change].set_path(rng.gen_range(0..nb_leaves));
+        client.change_block(
+            &mut path_values,
+            [6].to_vec(),
+            block_size,
+            nb_leaves,
+        );
 
         assert_ne!(path_values.len(), 0);
 
@@ -228,13 +235,19 @@ mod tests {
 
         let nb_blocks: usize = 15;
         let nb_leaves = (1 << (nb_blocks.ilog2() + 1)) / 2;
+        let block_size: usize = 16;
 
-        let mut dummies = Vec::new();
-        for ct in CIPHERTEXTS[0..nb_blocks * BUCKET_SIZE].to_vec() {
-            dummies
-                .push(DataItem::new(ct.to_vec(), rng.gen_range(0..nb_leaves)));
-        }
+        let mut client = ClientORAM::new();
+        client.gen_key();
 
+        let dummies_result = client.generate_dummies(nb_blocks, block_size);
+
+        assert!(dummies_result.is_ok());
+        let mut dummies = dummies_result.unwrap();
+
+        /*
+         * Server.
+         */
         let res_oram = ORAM::new(&mut dummies, nb_blocks);
 
         assert!(res_oram.is_ok());
@@ -247,9 +260,16 @@ mod tests {
         let path_values_opt = res_access.unwrap();
 
         assert!(path_values_opt.is_some());
-        let path_values = path_values_opt.unwrap();
+        let mut path_values = path_values_opt.unwrap();
 
         assert_ne!(path_values.len(), 0);
+
+        client.change_block(
+            &mut path_values,
+            [].to_vec(),
+            block_size,
+            nb_leaves,
+        );
 
         let res_access = path_oram.access(
             AccessType::Write,
@@ -279,13 +299,19 @@ mod tests {
 
         let nb_blocks: usize = 15;
         let nb_leaves = (1 << (nb_blocks.ilog2() + 1)) / 2;
+        let block_size: usize = 16;
 
-        let mut dummies = Vec::new();
-        for ct in CIPHERTEXTS[0..nb_blocks * BUCKET_SIZE].to_vec() {
-            dummies
-                .push(DataItem::new(ct.to_vec(), rng.gen_range(0..nb_leaves)));
-        }
+        let mut client = ClientORAM::new();
+        client.gen_key();
 
+        let dummies_result = client.generate_dummies(nb_blocks, block_size);
+
+        assert!(dummies_result.is_ok());
+        let mut dummies = dummies_result.unwrap();
+
+        /*
+         * Server.
+         */
         let res_oram = ORAM::new(&mut dummies, nb_blocks);
 
         assert!(res_oram.is_ok());
@@ -300,32 +326,14 @@ mod tests {
         assert!(path_values_opt.is_some());
         let mut path_values = path_values_opt.unwrap();
 
-        // Change block 6.
-        let block_change = 6;
-
-        path_values[block_change]
-            .set_data([21, 188, 234, 210, 25, 251, 146, 34].to_vec());
-        path_values[block_change].set_path(rng.gen_range(0..nb_leaves));
-
-        let block_change = 0;
-
-        path_values[block_change]
-            .set_data([211, 18, 23, 21, 253, 25, 14, 222].to_vec());
-        path_values[block_change].set_path(rng.gen_range(0..nb_leaves));
-
-        let block_change = 9;
-
-        path_values[block_change]
-            .set_data([21, 188, 234, 210, 25, 251, 146, 34].to_vec());
-        path_values[block_change].set_path(rng.gen_range(0..nb_leaves));
-
-        let block_change = 3;
-
-        path_values[block_change]
-            .set_data([21, 188, 234, 210, 25, 251, 146, 34].to_vec());
-        path_values[block_change].set_path(rng.gen_range(0..nb_leaves));
-
         assert_ne!(path_values.len(), 0);
+        // Change blocks 0, 3, 6 and 9.
+        client.change_block(
+            &mut path_values,
+            [0, 3, 6, 9].to_vec(),
+            block_size,
+            nb_leaves,
+        );
 
         let res_access = path_oram.access(
             AccessType::Write,
@@ -355,13 +363,19 @@ mod tests {
 
         let nb_blocks: usize = 15;
         let nb_leaves = (1 << (nb_blocks.ilog2() + 1)) / 2;
+        let block_size: usize = 16;
 
-        let mut dummies = Vec::new();
-        for ct in CIPHERTEXTS[0..nb_blocks * BUCKET_SIZE].to_vec() {
-            dummies
-                .push(DataItem::new(ct.to_vec(), rng.gen_range(0..nb_leaves)));
-        }
+        let mut client = ClientORAM::new();
+        client.gen_key();
 
+        let dummies_result = client.generate_dummies(nb_blocks, block_size);
+
+        assert!(dummies_result.is_ok());
+        let mut dummies = dummies_result.unwrap();
+
+        /*
+         * Server.
+         */
         let res_oram = ORAM::new(&mut dummies, nb_blocks);
 
         assert!(res_oram.is_ok());
@@ -378,11 +392,13 @@ mod tests {
         assert_ne!(path_values.len(), 0);
 
         // RESTORE EVERYTHING.
-        (0..path_values.len()).for_each(|i| {
-            path_values[i]
-                .set_data([21, 188, 234, 210, 25, 251, 146, 34].to_vec());
-            path_values[i].set_path(rng.gen_range(0..nb_leaves));
-        });
+        let number_of_blocks_read = path_values.len();
+        client.change_block(
+            &mut path_values,
+            (0..number_of_blocks_read).into_iter().collect(),
+            block_size,
+            nb_leaves,
+        );
 
         let res_access = path_oram.access(
             AccessType::Write,
