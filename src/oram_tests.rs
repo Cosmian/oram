@@ -191,6 +191,13 @@ mod tests {
         assert!(path_values_opt.is_some());
         let mut path_values = path_values_opt.unwrap();
 
+        // Change block 6.
+        let block_change = 6;
+
+        path_values[block_change]
+            .set_data([21, 188, 234, 210, 25, 251, 146, 34].to_vec());
+        path_values[block_change].set_path(rng.gen_range(0..nb_leaves));
+
         assert_ne!(path_values.len(), 0);
 
         let res_access = path_oram.access(
@@ -211,7 +218,191 @@ mod tests {
                 .filter(|remnant| !remnant.data().is_empty())
                 .collect::<Vec<_>>()
                 .len()
-                < path_oram.tree().height() as usize
+                < path_oram.tree().height() as usize * BUCKET_SIZE
+        );
+    }
+
+    #[test]
+    fn read_write_access_no_change() {
+        let mut rng: rand::rngs::ThreadRng = rand::thread_rng();
+
+        let nb_blocks: usize = 15;
+        let nb_leaves = (1 << (nb_blocks.ilog2() + 1)) / 2;
+
+        let mut dummies = Vec::new();
+        for ct in CIPHERTEXTS[0..nb_blocks * BUCKET_SIZE].to_vec() {
+            dummies
+                .push(DataItem::new(ct.to_vec(), rng.gen_range(0..nb_leaves)));
+        }
+
+        let res_oram = ORAM::new(&mut dummies, nb_blocks);
+
+        assert!(res_oram.is_ok());
+        let mut path_oram = res_oram.unwrap();
+
+        let path = 3;
+        let res_access = path_oram.access(AccessType::Read, path, Option::None);
+
+        assert!(res_access.is_ok());
+        let path_values_opt = res_access.unwrap();
+
+        assert!(path_values_opt.is_some());
+        let path_values = path_values_opt.unwrap();
+
+        assert_ne!(path_values.len(), 0);
+
+        let res_access = path_oram.access(
+            AccessType::Write,
+            path,
+            Some(path_values).as_mut(),
+        );
+
+        assert!(res_access.is_ok());
+        let path_values_opt = res_access.unwrap();
+        assert!(path_values_opt.is_some());
+        let stash = path_values_opt.unwrap();
+
+        // Path-Oram success.
+        assert!(
+            stash
+                .iter()
+                .filter(|remnant| !remnant.data().is_empty())
+                .collect::<Vec<_>>()
+                .len()
+                < path_oram.tree().height() as usize * BUCKET_SIZE
+        );
+    }
+
+    #[test]
+    fn read_write_acess_few_changes() {
+        let mut rng: rand::rngs::ThreadRng = rand::thread_rng();
+
+        let nb_blocks: usize = 15;
+        let nb_leaves = (1 << (nb_blocks.ilog2() + 1)) / 2;
+
+        let mut dummies = Vec::new();
+        for ct in CIPHERTEXTS[0..nb_blocks * BUCKET_SIZE].to_vec() {
+            dummies
+                .push(DataItem::new(ct.to_vec(), rng.gen_range(0..nb_leaves)));
+        }
+
+        let res_oram = ORAM::new(&mut dummies, nb_blocks);
+
+        assert!(res_oram.is_ok());
+        let mut path_oram = res_oram.unwrap();
+
+        let path = 3;
+        let res_access = path_oram.access(AccessType::Read, path, Option::None);
+
+        assert!(res_access.is_ok());
+        let path_values_opt = res_access.unwrap();
+
+        assert!(path_values_opt.is_some());
+        let mut path_values = path_values_opt.unwrap();
+
+        // Change block 6.
+        let block_change = 6;
+
+        path_values[block_change]
+            .set_data([21, 188, 234, 210, 25, 251, 146, 34].to_vec());
+        path_values[block_change].set_path(rng.gen_range(0..nb_leaves));
+
+        let block_change = 0;
+
+        path_values[block_change]
+            .set_data([211, 18, 23, 21, 253, 25, 14, 222].to_vec());
+        path_values[block_change].set_path(rng.gen_range(0..nb_leaves));
+
+        let block_change = 9;
+
+        path_values[block_change]
+            .set_data([21, 188, 234, 210, 25, 251, 146, 34].to_vec());
+        path_values[block_change].set_path(rng.gen_range(0..nb_leaves));
+
+        let block_change = 3;
+
+        path_values[block_change]
+            .set_data([21, 188, 234, 210, 25, 251, 146, 34].to_vec());
+        path_values[block_change].set_path(rng.gen_range(0..nb_leaves));
+
+        assert_ne!(path_values.len(), 0);
+
+        let res_access = path_oram.access(
+            AccessType::Write,
+            path,
+            Some(path_values).as_mut(),
+        );
+
+        assert!(res_access.is_ok());
+        let path_values_opt = res_access.unwrap();
+        assert!(path_values_opt.is_some());
+        let stash = path_values_opt.unwrap();
+
+        // Path-Oram success.
+        assert!(
+            stash
+                .iter()
+                .filter(|remnant| !remnant.data().is_empty())
+                .collect::<Vec<_>>()
+                .len()
+                < path_oram.tree().height() as usize * BUCKET_SIZE
+        );
+    }
+
+    #[test]
+    fn read_write_acess_all_changes() {
+        let mut rng: rand::rngs::ThreadRng = rand::thread_rng();
+
+        let nb_blocks: usize = 15;
+        let nb_leaves = (1 << (nb_blocks.ilog2() + 1)) / 2;
+
+        let mut dummies = Vec::new();
+        for ct in CIPHERTEXTS[0..nb_blocks * BUCKET_SIZE].to_vec() {
+            dummies
+                .push(DataItem::new(ct.to_vec(), rng.gen_range(0..nb_leaves)));
+        }
+
+        let res_oram = ORAM::new(&mut dummies, nb_blocks);
+
+        assert!(res_oram.is_ok());
+        let mut path_oram = res_oram.unwrap();
+
+        let path = 3;
+        let res_access = path_oram.access(AccessType::Read, path, Option::None);
+
+        assert!(res_access.is_ok());
+        let path_values_opt = res_access.unwrap();
+
+        assert!(path_values_opt.is_some());
+        let mut path_values = path_values_opt.unwrap();
+        assert_ne!(path_values.len(), 0);
+
+        // RESTORE EVERYTHING.
+        (0..path_values.len()).for_each(|i| {
+            path_values[i]
+                .set_data([21, 188, 234, 210, 25, 251, 146, 34].to_vec());
+            path_values[i].set_path(rng.gen_range(0..nb_leaves));
+        });
+
+        let res_access = path_oram.access(
+            AccessType::Write,
+            path,
+            Some(path_values.as_mut()),
+        );
+
+        assert!(res_access.is_ok());
+        let path_values_opt = res_access.unwrap();
+        assert!(path_values_opt.is_some());
+        let stash = path_values_opt.unwrap();
+
+        // Path-Oram success.
+        assert!(
+            stash
+                .iter()
+                .filter(|remnant| !remnant.data().is_empty())
+                .collect::<Vec<_>>()
+                .len()
+                < path_oram.tree().height() as usize * BUCKET_SIZE
         );
     }
 }

@@ -2,6 +2,8 @@ mod btree;
 mod oram;
 mod oram_tests;
 
+use std::io::{Error, ErrorKind};
+
 use crate::{
     btree::DataItem,
     oram::{AccessType, BUCKET_SIZE, ORAM},
@@ -72,7 +74,7 @@ const CIPHERTEXTS: [[u8; 8]; 60] = [
     [163, 102, 112, 243, 1, 68, 53, 172],
 ];
 
-fn main() {
+fn main() -> Result<(), Error> {
     println!("Hello, Path-ORAM!");
     let mut rng: rand::rngs::ThreadRng = rand::thread_rng();
 
@@ -97,7 +99,14 @@ fn main() {
 
     if path_values.is_none() {
         println!("INVALID PATH");
-        return;
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!(
+                "Invalid path access. Got {}, expected in range 0..{}",
+                path,
+                path_oram.tree().height() - 1
+            ),
+        ));
     }
 
     // After decryption, change block number 6.
@@ -123,4 +132,6 @@ fn main() {
             );
         }
     }
+
+    Ok(())
 }

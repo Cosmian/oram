@@ -50,7 +50,7 @@ impl BTree {
         for i in 0..BUCKET_SIZE {
             for j in 0..dummies.len() {
                 /* At this point path is only `level` bits long. We compare the
-                 * MSB of the path of the element to insert to see if the path
+                 * MSB of the path of the element to insert, to see if the path
                  * is at an intersection with the current visit of the tree.
                  */
                 if dummies[j].path() >> (self.height - level - 1) == path {

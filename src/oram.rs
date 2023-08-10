@@ -128,9 +128,12 @@ impl ORAM {
                 path_data.push(data_item.clone());
             });
 
-            // Left-to-right bitwise analysis. Substraction of 2 because one is for height being one more than path bit length.
-            // The other one is because we want to see the bit corresponding to the next level.
-            // check overflow here.
+            /*
+             * Left-to-right bitwise analysis. Substraction of 2 because one is
+             * for height being one more than path bit length. The other one is
+             * because we want to see the bit corresponding to the next level.
+             * Below condition checks overflow.
+             */
             let mut bit_shift = (height - level) as i16 - 2;
             if bit_shift < 0 {
                 bit_shift = 0;
@@ -204,9 +207,15 @@ impl ORAM {
             // FIXME - one-liner possible ?
             for i in 0..BUCKET_SIZE {
                 for j in 0..path_data.len() {
-                    if path_data[j].path() >> (height - level)
-                        == path >> (height - level)
-                        && !path_data[j].data().is_empty()
+                    /*
+                     * If node bucket is empty (rare case where init could not
+                     * fill element) or if path intersects and element to insert
+                     * is not empty.
+                     */
+                    if node.bucket()[i].data().is_empty()
+                        || path_data[j].path() >> (height - level)
+                            == path >> (height - level)
+                            && !path_data[j].data().is_empty()
                     {
                         // Remove element from vector once inserted.
                         node.set_bucket_element(path_data.remove(j), i);
