@@ -3,14 +3,13 @@ mod client;
 mod oram;
 mod oram_tests;
 
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 
 use crate::{
     client::ClientORAM,
     oram::{AccessType, ORAM},
 };
 
-use rand::{Rng, RngCore};
 fn main() -> Result<(), Error> {
     println!("Hello, Path-ORAM!");
 
@@ -25,7 +24,6 @@ fn main() -> Result<(), Error> {
      * Client.
      */
     let mut client = ClientORAM::new();
-    client.gen_key();
 
     let dummies_result = client.generate_dummies(nb_blocks, block_size);
 
@@ -53,7 +51,24 @@ fn main() -> Result<(), Error> {
      * Client side now.
      * After decryption, change block number 6.
      */
-    client.change_block(&mut path_values, [6].to_vec(), block_size, nb_leaves);
+    let decrypt_res = client.decrypt_blocks(&mut path_values);
+    if decrypt_res.is_err() {
+        return Err(Error::new(
+            ErrorKind::Interrupted,
+            Result::unwrap_err(decrypt_res).to_string(),
+        ));
+    }
+
+    // Here path_values is a vector containing plaintexts.
+
+    let encrypt_res =
+        client.encrypt_blocks(&mut path_values, [6].to_vec(), nb_leaves);
+    if encrypt_res.is_err() {
+        return Err(Error::new(
+            ErrorKind::Interrupted,
+            Result::unwrap_err(encrypt_res).to_string(),
+        ));
+    }
 
     /*
      * Each Read operation **must** be followed by a write operation on the same

@@ -1,33 +1,33 @@
-use cosmian_crypto_core::{reexport::rand_core::SeedableRng, CsRng};
+use cosmian_crypto_core::{
+    reexport::rand_core::SeedableRng, Aes256Gcm, CryptoCoreError, CsRng, Dem,
+    FixedSizeCBytes, Instantiable, Nonce, RandomFixedSizeCBytes, SymmetricKey,
+};
 use rand::{Rng, RngCore};
 use std::io::{Error, ErrorKind};
 
 use crate::{btree::DataItem, oram::BUCKET_SIZE};
 
-const KEY_SIZE: usize = 32;
-const NONCE_SIZE: usize = 16;
-
 pub struct ClientORAM {
     pub stash: Vec<DataItem>,
-    pub csprng: CsRng, // FIXME back to private when change_block is done.
-    key: [u8; KEY_SIZE],
-    nonce: [u8; NONCE_SIZE],
+    csprng: CsRng,
+    key: SymmetricKey<{ Aes256Gcm::KEY_LENGTH }>,
 }
 
 impl ClientORAM {
     pub fn new() -> ClientORAM {
+        let mut csprng = CsRng::from_entropy();
+        let key = SymmetricKey::new(&mut csprng);
+
         ClientORAM {
             // Empty stash at initialization.
             stash: Vec::new(),
-            csprng: CsRng::from_entropy(),
-            key: [0; KEY_SIZE],
-            nonce: [0; NONCE_SIZE],
+            csprng,
+            key,
         }
     }
 
     pub fn gen_key(&mut self) {
-        self.csprng.fill_bytes(&mut self.key);
-        self.csprng.fill_bytes(&mut self.nonce);
+        self.key = SymmetricKey::new(&mut self.csprng);
     }
 
     pub fn generate_dummies(
@@ -46,43 +46,110 @@ impl ClientORAM {
         let nb_leaves = (nb_blocks + 1) / 2;
         let mut dummies = Vec::new();
 
+        let cipher = Aes256Gcm::new(&self.key);
+
+        // FIXME - encrypt fixed dummy value instead of encrypting randoms.
         for _ in 0..nb_blocks * BUCKET_SIZE {
-            let mut dummy_data = Vec::with_capacity(block_size);
+            // Generate new random dummy data.
+            let mut dummy_data = vec![0; block_size];
             self.csprng.fill_bytes(&mut dummy_data);
+
+            // Generate new nonce for encryption.
+            let nonce = Nonce::new(&mut self.csprng);
+
+            // Encrypt dummies to provide correct MAC for later decryption.
+            let ciphertext_res =
+                cipher.encrypt(&nonce, &dummy_data, Option::None);
+
+            if ciphertext_res.is_err() {
+                return Err(Error::new(
+                    ErrorKind::Interrupted,
+                    Result::unwrap_err(ciphertext_res).to_string(),
+                ));
+            }
+
+            let encrypted_dummy =
+                [nonce.as_bytes(), ciphertext_res.unwrap().as_slice()].concat();
 
             // FIXME- uniform generation for now. Is fine but dummies' paths do
             // not need to be generated at random.
             let path = self.csprng.gen_range(0..nb_leaves);
 
-            dummies.push(DataItem::new(dummy_data, path as u16));
+            dummies.push(DataItem::new(encrypted_dummy, path as u16));
         }
 
         Ok(dummies)
     }
 
-    pub fn change_block(
+    pub fn encrypt_blocks(
         &mut self,
         blocks: &mut Vec<DataItem>,
         block_ids: Vec<usize>,
-        block_size: usize,
         max_path: usize,
-    ) {
-        // Decrypt block.
-        // decrypt(blocks[block_id]);
-        // XXX - for now just random sample u8 values to simulate encryption.
-        block_ids.iter().for_each(|&i| {
-            let mut new_ciphertext = Vec::with_capacity(block_size);
-            self.csprng.fill_bytes(&mut new_ciphertext);
-            blocks[i].set_data(new_ciphertext);
+    ) -> Result<(), CryptoCoreError> {
+        self.gen_key();
+        let cipher = Aes256Gcm::new(&self.key);
 
-            // Assign new random uniform path to block.
-            blocks[i].set_path(self.csprng.gen_range(0..max_path as u16));
-        });
+        for i in 0..blocks.len() {
+            // Generate new nonce for encryption.
+            let nonce = Nonce::new(&mut self.csprng);
 
-        // gen new ecnryption key
-        self.gen_key()
+            let ciphertext_res =
+                cipher.encrypt(&nonce, blocks[i].data(), Option::None);
+            if ciphertext_res.is_err() {
+                return Err(Result::unwrap_err(ciphertext_res));
+            }
 
-        // Encrypt all blocks.
-        // blocks.iter().for_each(|item| item.data().encrypt())
+            // Change element data to plaintext.
+            blocks[i].set_data(
+                [nonce.as_bytes(), ciphertext_res.unwrap().as_slice()].concat(),
+            );
+
+            /*
+             * If the block is among the ones to change, change its path by
+             * sampling a random uniform distribution.
+             */
+            if block_ids.contains(&i) {
+                blocks[i].set_path(self.csprng.gen_range(0..max_path as u16))
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn decrypt_blocks(
+        &self,
+        blocks: &mut Vec<DataItem>,
+    ) -> Result<(), CryptoCoreError> {
+        let cipher = Aes256Gcm::new(&self.key);
+
+        for i in 0..blocks.len() {
+            // Edge-case where dummies left cells uninitialized.
+            if blocks[i].data().is_empty() {
+                continue;
+            }
+
+            let nonce_res = Nonce::try_from_slice(
+                &blocks[i].data()[..Aes256Gcm::NONCE_LENGTH],
+            );
+            if nonce_res.is_err() {
+                return Err(Result::unwrap_err(nonce_res));
+            }
+
+            let nonce = nonce_res.unwrap();
+            let plaintext_res = cipher.decrypt(
+                &nonce,
+                &blocks[i].data()[Aes256Gcm::NONCE_LENGTH..],
+                Option::None,
+            );
+
+            if plaintext_res.is_err() {
+                return Err(Result::unwrap_err(plaintext_res));
+            }
+
+            blocks[i].set_data(plaintext_res.unwrap());
+        }
+
+        Ok(())
     }
 }

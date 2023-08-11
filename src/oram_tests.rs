@@ -1,7 +1,5 @@
 #[cfg(test)]
 mod tests {
-    use rand::Rng;
-
     use crate::{
         btree::Node,
         client::ClientORAM,
@@ -166,14 +164,11 @@ mod tests {
 
     #[test]
     fn read_write_access() {
-        let mut rng: rand::rngs::ThreadRng = rand::thread_rng();
-
         let nb_blocks: usize = 15;
         let nb_leaves = (1 << (nb_blocks.ilog2() + 1)) / 2;
         let block_size: usize = 16;
 
         let mut client = ClientORAM::new();
-        client.gen_key();
 
         let dummies_result = client.generate_dummies(nb_blocks, block_size);
 
@@ -197,13 +192,18 @@ mod tests {
         assert!(path_values_opt.is_some());
         let mut path_values = path_values_opt.unwrap();
 
-        // Change block 6.
-        client.change_block(
-            &mut path_values,
-            [6].to_vec(),
-            block_size,
-            nb_leaves,
-        );
+        /*
+         * Client side now.
+         * After decryption, change block number 6.
+         */
+        let decryption_res = client.decrypt_blocks(&mut path_values);
+        assert!(decryption_res.is_ok());
+
+        // Here path_values is a vector containing plaintexts.
+
+        let encryption_res =
+            client.encrypt_blocks(&mut path_values, [6].to_vec(), nb_leaves);
+        assert!(encryption_res.is_ok());
 
         assert_ne!(path_values.len(), 0);
 
@@ -231,14 +231,11 @@ mod tests {
 
     #[test]
     fn read_write_access_no_change() {
-        let mut rng: rand::rngs::ThreadRng = rand::thread_rng();
-
         let nb_blocks: usize = 15;
         let nb_leaves = (1 << (nb_blocks.ilog2() + 1)) / 2;
         let block_size: usize = 16;
 
         let mut client = ClientORAM::new();
-        client.gen_key();
 
         let dummies_result = client.generate_dummies(nb_blocks, block_size);
 
@@ -264,12 +261,18 @@ mod tests {
 
         assert_ne!(path_values.len(), 0);
 
-        client.change_block(
-            &mut path_values,
-            [].to_vec(),
-            block_size,
-            nb_leaves,
-        );
+        /*
+         * Client side now.
+         * After decryption, don't change nothing.
+         */
+        let decryption_res = client.decrypt_blocks(&mut path_values);
+        assert!(decryption_res.is_ok());
+
+        // Here path_values is a vector containing plaintexts.
+
+        let encryption_res =
+            client.encrypt_blocks(&mut path_values, [].to_vec(), nb_leaves);
+        assert!(encryption_res.is_ok());
 
         let res_access = path_oram.access(
             AccessType::Write,
@@ -295,14 +298,11 @@ mod tests {
 
     #[test]
     fn read_write_acess_few_changes() {
-        let mut rng: rand::rngs::ThreadRng = rand::thread_rng();
-
         let nb_blocks: usize = 15;
         let nb_leaves = (1 << (nb_blocks.ilog2() + 1)) / 2;
         let block_size: usize = 16;
 
         let mut client = ClientORAM::new();
-        client.gen_key();
 
         let dummies_result = client.generate_dummies(nb_blocks, block_size);
 
@@ -327,13 +327,22 @@ mod tests {
         let mut path_values = path_values_opt.unwrap();
 
         assert_ne!(path_values.len(), 0);
-        // Change blocks 0, 3, 6 and 9.
-        client.change_block(
+
+        /*
+         * Client side now.
+         * After decryption, change block number 0, 3, 6 and 9.
+         */
+        let decryption_res = client.decrypt_blocks(&mut path_values);
+        assert!(decryption_res.is_ok());
+
+        // Here path_values is a vector containing plaintexts.
+
+        let encryption_res = client.encrypt_blocks(
             &mut path_values,
             [0, 3, 6, 9].to_vec(),
-            block_size,
             nb_leaves,
         );
+        assert!(encryption_res.is_ok());
 
         let res_access = path_oram.access(
             AccessType::Write,
@@ -359,14 +368,11 @@ mod tests {
 
     #[test]
     fn read_write_acess_all_changes() {
-        let mut rng: rand::rngs::ThreadRng = rand::thread_rng();
-
         let nb_blocks: usize = 15;
         let nb_leaves = (1 << (nb_blocks.ilog2() + 1)) / 2;
         let block_size: usize = 16;
 
         let mut client = ClientORAM::new();
-        client.gen_key();
 
         let dummies_result = client.generate_dummies(nb_blocks, block_size);
 
@@ -391,14 +397,22 @@ mod tests {
         let mut path_values = path_values_opt.unwrap();
         assert_ne!(path_values.len(), 0);
 
-        // RESTORE EVERYTHING.
+        /*
+         * Client side now.
+         * After decryption, RESTORE EVERYTHING.
+         */
+        let decryption_res = client.decrypt_blocks(&mut path_values);
+        assert!(decryption_res.is_ok());
+
+        // Here path_values is a vector containing plaintexts.
+
         let number_of_blocks_read = path_values.len();
-        client.change_block(
+        let encryption_res = client.encrypt_blocks(
             &mut path_values,
             (0..number_of_blocks_read).into_iter().collect(),
-            block_size,
             nb_leaves,
         );
+        assert!(encryption_res.is_ok());
 
         let res_access = path_oram.access(
             AccessType::Write,
