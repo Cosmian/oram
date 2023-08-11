@@ -3,7 +3,6 @@ use crate::oram::BUCKET_SIZE;
 #[derive(Debug, Clone, Default)]
 pub struct BTree {
     pub(super) root: Option<Box<Node>>,
-    nb_blocks: usize,
     height: u16,
 }
 
@@ -11,7 +10,6 @@ impl BTree {
     pub fn init_new(dummies: &mut Vec<DataItem>, nb_blocks: usize) -> BTree {
         let mut tree = BTree {
             root: Option::None,
-            nb_blocks,
             height: nb_blocks.ilog2() as u16 + 1,
         };
 
@@ -59,10 +57,6 @@ impl BTree {
                 }
             }
         }
-    }
-
-    pub fn nb_blocks(&self) -> usize {
-        self.nb_blocks
     }
 
     pub fn height(&self) -> u16 {

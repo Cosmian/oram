@@ -90,7 +90,8 @@ impl ClientORAM {
         self.gen_key();
         let cipher = Aes256Gcm::new(&self.key);
 
-        for i in 0..blocks.len() {
+        let mut i = 0;
+        while i < blocks.len() {
             // Generate new nonce for encryption.
             let nonce = Nonce::new(&mut self.csprng);
 
@@ -112,6 +113,8 @@ impl ClientORAM {
             if block_ids.contains(&i) {
                 blocks[i].set_path(self.csprng.gen_range(0..max_path as u16))
             }
+
+            i += 1;
         }
 
         Ok(())
@@ -123,9 +126,11 @@ impl ClientORAM {
     ) -> Result<(), CryptoCoreError> {
         let cipher = Aes256Gcm::new(&self.key);
 
-        for i in 0..blocks.len() {
+        let mut i = 0;
+        while i < blocks.len() {
             // Edge-case where dummies left cells uninitialized.
             if blocks[i].data().is_empty() {
+                i += 1;
                 continue;
             }
 
@@ -148,6 +153,8 @@ impl ClientORAM {
             }
 
             blocks[i].set_data(plaintext_res.unwrap());
+
+            i += 1;
         }
 
         Ok(())

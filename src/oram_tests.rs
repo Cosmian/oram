@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::{
-        btree::{DataItem, Node},
+        btree::Node,
         client::ClientORAM,
         oram::{AccessType, BUCKET_SIZE, ORAM},
     };
