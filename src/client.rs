@@ -32,10 +32,10 @@ impl ClientORAM {
 
     pub fn generate_dummies(
         &mut self,
-        nb_blocks: usize,
+        nb_dummies: usize,
         block_size: usize,
     ) -> Result<Vec<DataItem>, Error> {
-        if !(nb_blocks + 1).is_power_of_two() {
+        if !(nb_dummies + 1).is_power_of_two() {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
                 "Number of blocks shall be power of 2 minus one".to_string(),
@@ -43,13 +43,13 @@ impl ClientORAM {
         }
 
         // Number of leaves is 2^(l-1) if number of blocks is 2^l - 1.
-        let nb_leaves = (nb_blocks + 1) / 2;
+        let nb_leaves = (nb_dummies + 1) / 2;
         let mut dummies = Vec::new();
 
         let cipher = Aes256Gcm::new(&self.key);
 
         // FIXME - encrypt fixed dummy value instead of encrypting randoms.
-        for _ in 0..nb_blocks * BUCKET_SIZE {
+        for _ in 0..nb_dummies * BUCKET_SIZE {
             // Generate new random dummy data.
             let mut dummy_data = vec![0; block_size];
             self.csprng.fill_bytes(&mut dummy_data);
