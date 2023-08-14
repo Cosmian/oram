@@ -170,7 +170,7 @@ mod tests {
 
         let mut client = ClientORAM::new();
 
-        let dummies_result = client.generate_dummies(nb_items, ct_size);
+        let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
         assert!(dummies_result.is_ok());
         let mut dummies = dummies_result.unwrap();
@@ -237,7 +237,7 @@ mod tests {
 
         let mut client = ClientORAM::new();
 
-        let dummies_result = client.generate_dummies(nb_items, ct_size);
+        let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
         assert!(dummies_result.is_ok());
         let mut dummies = dummies_result.unwrap();
@@ -304,7 +304,7 @@ mod tests {
 
         let mut client = ClientORAM::new();
 
-        let dummies_result = client.generate_dummies(nb_items, ct_size);
+        let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
         assert!(dummies_result.is_ok());
         let mut dummies = dummies_result.unwrap();
@@ -374,7 +374,7 @@ mod tests {
 
         let mut client = ClientORAM::new();
 
-        let dummies_result = client.generate_dummies(nb_items, ct_size);
+        let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
         assert!(dummies_result.is_ok());
         let mut dummies = dummies_result.unwrap();
@@ -442,7 +442,7 @@ mod tests {
         let ct_size = 16;
         let mut client = ClientORAM::new();
 
-        let dummies_res = client.generate_dummies(nb_items, ct_size);
+        let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
         assert!(dummies_res.is_ok());
         let dummies = dummies_res.unwrap();
@@ -455,7 +455,7 @@ mod tests {
         let ct_size = 16;
         let mut client = ClientORAM::new();
 
-        let dummies_res = client.generate_dummies(nb_items, ct_size);
+        let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
         assert!(dummies_res.is_err());
     }
@@ -466,7 +466,7 @@ mod tests {
         let ct_size = 16;
         let mut client = ClientORAM::new();
 
-        let dummies_res = client.generate_dummies(nb_items, ct_size);
+        let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
         assert!(dummies_res.is_ok());
         let dummies = dummies_res.unwrap();
@@ -479,7 +479,7 @@ mod tests {
         let ct_size = 16;
         let mut client = ClientORAM::new();
 
-        let dummies_res = client.generate_dummies(nb_items, ct_size);
+        let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
         assert!(dummies_res.is_ok());
         let dummies = dummies_res.unwrap();
@@ -492,7 +492,7 @@ mod tests {
         let ct_size = 0;
         let mut client = ClientORAM::new();
 
-        let dummies_res = client.generate_dummies(nb_items, ct_size);
+        let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
         assert!(dummies_res.is_ok());
         let dummies = dummies_res.unwrap();
@@ -507,7 +507,7 @@ mod tests {
         let ct_size = 1000;
         let mut client = ClientORAM::new();
 
-        let dummies_res = client.generate_dummies(nb_items, ct_size);
+        let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
         assert!(dummies_res.is_ok());
         let dummies = dummies_res.unwrap();
@@ -523,7 +523,7 @@ mod tests {
         let ct_size = 16;
         let mut client = ClientORAM::new();
 
-        let dummies_res = client.generate_dummies(nb_items, ct_size);
+        let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
         assert!(dummies_res.is_ok());
         let mut dummies = dummies_res.unwrap();
@@ -561,7 +561,7 @@ mod tests {
          */
         let mut client = ClientORAM::new();
 
-        let dummies_result = client.generate_dummies(nb_items, ct_size);
+        let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
         assert!(dummies_result.is_ok());
         let mut dummies = dummies_result.unwrap();

@@ -25,7 +25,7 @@ fn main() -> Result<(), Error> {
      */
     let mut client = ClientORAM::new();
 
-    let dummies_result = client.generate_dummies(nb_items, ct_size);
+    let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
     assert!(dummies_result.is_ok());
     let mut dummies = dummies_result.unwrap();

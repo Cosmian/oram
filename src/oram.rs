@@ -14,7 +14,7 @@ pub struct ORAM {
 
 impl ORAM {
     pub fn new(
-        dummies: &mut Vec<DataItem>,
+        data_items: &mut Vec<DataItem>,
         nb_items: usize,
     ) -> Result<ORAM, Error> {
         if nb_items == 0 {
@@ -24,7 +24,7 @@ impl ORAM {
             ));
         }
         Ok(ORAM {
-            tree: BTree::init_new(dummies, nb_items),
+            tree: BTree::init_new(data_items, nb_items),
         })
     }
 

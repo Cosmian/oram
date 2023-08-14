@@ -28,24 +28,25 @@ impl ClientORAM {
         }
     }
 
-    pub fn generate_dummies(
+    pub fn generate_dummy_items(
         &mut self,
-        nb_dummies: usize,
+        nb_dummy_items: usize,
         ct_size: usize,
     ) -> Result<Vec<DataItem>, Error> {
-        if !(nb_dummies + 1).is_power_of_two() {
+        if !(nb_dummy_items + 1).is_power_of_two() {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                "Number of items shall be power of 2 minus one".to_string(),
+                "Number of dummy items shall be power of 2 minus one"
+                    .to_string(),
             ));
         }
 
         // Number of leaves is 2^(l-1) if number of items is 2^l - 1.
-        let nb_leaves = (nb_dummies + 1) / 2;
-        let mut dummies = Vec::new();
+        let nb_leaves = (nb_dummy_items + 1) / 2;
+        let mut dummy_items = Vec::new();
 
         // FIXME - encrypt fixed dummy value instead of encrypting randoms.
-        for _ in 0..nb_dummies * BUCKET_SIZE {
+        for _ in 0..nb_dummy_items * BUCKET_SIZE {
             // Generate new random dummy data.
             let mut dummy_data = vec![0; ct_size];
             self.csprng.fill_bytes(&mut dummy_data);
@@ -71,10 +72,10 @@ impl ClientORAM {
             // not necessarily need to be generated at random.
             let path = self.csprng.gen_range(0..nb_leaves);
 
-            dummies.push(DataItem::new(encrypted_dummy, path as u16));
+            dummy_items.push(DataItem::new(encrypted_dummy, path as u16));
         }
 
-        Ok(dummies)
+        Ok(dummy_items)
     }
 
     pub fn encrypt_items(
