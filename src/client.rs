@@ -36,7 +36,7 @@ impl ClientORAM {
         let mut dummy_items = Vec::new();
 
         // FIXME - encrypt fixed dummy value instead of encrypting randoms.
-        for _ in 0..nb_dummy_items * BUCKET_SIZE {
+        for _ in 0..nb_dummy_items {
             // Generate new random dummy data.
             let mut dummy_data = vec![0; ct_size];
             self.csprng.fill_bytes(&mut dummy_data);

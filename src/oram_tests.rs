@@ -470,7 +470,7 @@ mod tests {
 
         assert!(dummies_res.is_ok());
         let dummies = dummies_res.unwrap();
-        assert_eq!(dummies.len(), nb_items * BUCKET_SIZE);
+        assert_eq!(dummies.len(), nb_items);
     }
 
     #[test]
@@ -483,7 +483,7 @@ mod tests {
 
         assert!(dummies_res.is_ok());
         let dummies = dummies_res.unwrap();
-        assert_eq!(dummies.len(), nb_items * BUCKET_SIZE);
+        assert_eq!(dummies.len(), nb_items);
     }
 
     #[test]
@@ -496,7 +496,7 @@ mod tests {
 
         assert!(dummies_res.is_ok());
         let dummies = dummies_res.unwrap();
-        assert_eq!(dummies.len(), nb_items * BUCKET_SIZE);
+        assert_eq!(dummies.len(), nb_items);
         // Nonce + tag length.
         assert_eq!(dummies[0].data().len(), 12 + 16);
     }
@@ -511,7 +511,7 @@ mod tests {
 
         assert!(dummies_res.is_ok());
         let dummies = dummies_res.unwrap();
-        assert_eq!(dummies.len(), nb_items * BUCKET_SIZE);
+        assert_eq!(dummies.len(), nb_items);
         // Nonce + tag length.
         assert_eq!(dummies[0].data().len(), ct_size + 12 + 16);
     }
