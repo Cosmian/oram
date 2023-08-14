@@ -55,7 +55,7 @@ impl ClientORAM {
             // not necessarily need to be generated at random.
             let path = self.csprng.gen_range(0..nb_leaves);
 
-            dummy_items.push(DataItem::new(encrypted_dummy, path as u16));
+            dummy_items.push(DataItem::new(encrypted_dummy, path));
         }
 
         Ok(dummy_items)
@@ -84,7 +84,7 @@ impl ClientORAM {
              * sampling a random uniform distribution.
              */
             if changed_items_idx.contains(&i) {
-                items[i].set_path(self.csprng.gen_range(0..max_path as u16))
+                items[i].set_path(self.csprng.gen_range(0..max_path))
             }
 
             i += 1;

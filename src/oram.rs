@@ -32,7 +32,7 @@ impl ORAM {
     pub fn access(
         &mut self,
         op: AccessType,
-        path: u16,
+        path: usize,
         data: Option<&mut Vec<DataItem>>,
     ) -> Result<Option<Vec<DataItem>>, Error> {
         if path > (1 << (self.tree.height() - 1)) - 1 {
@@ -91,7 +91,7 @@ impl ORAM {
     fn read_path(
         node: Option<&Box<Node>>,
         path_data: &mut Vec<DataItem>,
-        path: u16,
+        path: usize,
         height: u16,
         level: u16,
     ) {
@@ -136,7 +136,7 @@ impl ORAM {
     fn write_path(
         node: Option<&mut Box<Node>>,
         path_data: &mut Vec<DataItem>,
-        path: u16,
+        path: usize,
         height: u16,
         level: u16,
     ) {

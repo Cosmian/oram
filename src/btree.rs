@@ -26,7 +26,7 @@ impl BTree {
         &self,
         node: &mut Node,
         data_items: &mut Vec<DataItem>,
-        path: u16,
+        path: usize,
         level: u16,
     ) {
         // -1 is to avoid constructing 1 extra level.
@@ -97,11 +97,11 @@ impl Node {
 #[derive(Debug, Clone, Default)]
 pub struct DataItem {
     data: Vec<u8>,
-    path: u16,
+    path: usize,
 }
 
 impl DataItem {
-    pub fn new(data: Vec<u8>, path: u16) -> DataItem {
+    pub fn new(data: Vec<u8>, path: usize) -> DataItem {
         DataItem { data, path }
     }
 
@@ -109,7 +109,7 @@ impl DataItem {
         &self.data
     }
 
-    pub fn path(&self) -> u16 {
+    pub fn path(&self) -> usize {
         self.path
     }
 
@@ -117,7 +117,7 @@ impl DataItem {
         self.data = data;
     }
 
-    pub fn set_path(&mut self, path: u16) {
+    pub fn set_path(&mut self, path: usize) {
         self.path = path;
     }
 }
