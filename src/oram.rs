@@ -15,16 +15,16 @@ pub struct ORAM {
 impl ORAM {
     pub fn new(
         dummies: &mut Vec<DataItem>,
-        nb_blocks: usize,
+        nb_items: usize,
     ) -> Result<ORAM, Error> {
-        if nb_blocks == 0 {
+        if nb_items == 0 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                "Number of blocks shall not be null".to_string(),
+                "Number of itemss shall not be null".to_string(),
             ));
         }
         Ok(ORAM {
-            tree: BTree::init_new(dummies, nb_blocks),
+            tree: BTree::init_new(dummies, nb_items),
         })
     }
 

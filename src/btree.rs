@@ -7,10 +7,10 @@ pub struct BTree {
 }
 
 impl BTree {
-    pub fn init_new(dummies: &mut Vec<DataItem>, nb_blocks: usize) -> BTree {
+    pub fn init_new(dummies: &mut Vec<DataItem>, nb_items: usize) -> BTree {
         let mut tree = BTree {
             root: Option::None,
-            height: nb_blocks.ilog2() as u16 + 1,
+            height: nb_items.ilog2() as u16 + 1,
         };
 
         let path = 0;

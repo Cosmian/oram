@@ -33,16 +33,16 @@ impl ClientORAM {
     pub fn generate_dummies(
         &mut self,
         nb_dummies: usize,
-        block_size: usize,
+        ct_size: usize,
     ) -> Result<Vec<DataItem>, Error> {
         if !(nb_dummies + 1).is_power_of_two() {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                "Number of blocks shall be power of 2 minus one".to_string(),
+                "Number of items shall be power of 2 minus one".to_string(),
             ));
         }
 
-        // Number of leaves is 2^(l-1) if number of blocks is 2^l - 1.
+        // Number of leaves is 2^(l-1) if number of items is 2^l - 1.
         let nb_leaves = (nb_dummies + 1) / 2;
         let mut dummies = Vec::new();
 
@@ -51,7 +51,7 @@ impl ClientORAM {
         // FIXME - encrypt fixed dummy value instead of encrypting randoms.
         for _ in 0..nb_dummies * BUCKET_SIZE {
             // Generate new random dummy data.
-            let mut dummy_data = vec![0; block_size];
+            let mut dummy_data = vec![0; ct_size];
             self.csprng.fill_bytes(&mut dummy_data);
 
             // Generate new nonce for encryption.
@@ -81,28 +81,28 @@ impl ClientORAM {
         Ok(dummies)
     }
 
-    pub fn encrypt_blocks(
+    pub fn encrypt_items(
         &mut self,
-        blocks: &mut Vec<DataItem>,
-        block_ids: Vec<usize>,
+        items: &mut Vec<DataItem>,
+        changed_items_idx: Vec<usize>,
         max_path: usize,
     ) -> Result<(), CryptoCoreError> {
         self.gen_key();
         let cipher = Aes256Gcm::new(&self.key);
 
         let mut i = 0;
-        while i < blocks.len() {
+        while i < items.len() {
             // Generate new nonce for encryption.
             let nonce = Nonce::new(&mut self.csprng);
 
             let ciphertext_res =
-                cipher.encrypt(&nonce, blocks[i].data(), Option::None);
+                cipher.encrypt(&nonce, items[i].data(), Option::None);
             if ciphertext_res.is_err() {
                 return Err(Result::unwrap_err(ciphertext_res));
             }
 
             // Change element data to plaintext.
-            blocks[i].set_data(
+            items[i].set_data(
                 [nonce.as_bytes(), ciphertext_res.unwrap().as_slice()].concat(),
             );
 
@@ -110,8 +110,8 @@ impl ClientORAM {
              * If the block is among the ones to change, change its path by
              * sampling a random uniform distribution.
              */
-            if block_ids.contains(&i) {
-                blocks[i].set_path(self.csprng.gen_range(0..max_path as u16))
+            if changed_items_idx.contains(&i) {
+                items[i].set_path(self.csprng.gen_range(0..max_path as u16))
             }
 
             i += 1;
@@ -120,22 +120,22 @@ impl ClientORAM {
         Ok(())
     }
 
-    pub fn decrypt_blocks(
+    pub fn decrypt_items(
         &self,
-        blocks: &mut Vec<DataItem>,
+        items: &mut Vec<DataItem>,
     ) -> Result<(), CryptoCoreError> {
         let cipher = Aes256Gcm::new(&self.key);
 
         let mut i = 0;
-        while i < blocks.len() {
+        while i < items.len() {
             // Edge-case where dummies left cells uninitialized.
-            if blocks[i].data().is_empty() {
+            if items[i].data().is_empty() {
                 i += 1;
                 continue;
             }
 
             let nonce_res = Nonce::try_from_slice(
-                &blocks[i].data()[..Aes256Gcm::NONCE_LENGTH],
+                &items[i].data()[..Aes256Gcm::NONCE_LENGTH],
             );
             if nonce_res.is_err() {
                 return Err(Result::unwrap_err(nonce_res));
@@ -144,7 +144,7 @@ impl ClientORAM {
             let nonce = nonce_res.unwrap();
             let plaintext_res = cipher.decrypt(
                 &nonce,
-                &blocks[i].data()[Aes256Gcm::NONCE_LENGTH..],
+                &items[i].data()[Aes256Gcm::NONCE_LENGTH..],
                 Option::None,
             );
 
@@ -152,7 +152,7 @@ impl ClientORAM {
                 return Err(Result::unwrap_err(plaintext_res));
             }
 
-            blocks[i].set_data(plaintext_res.unwrap());
+            items[i].set_data(plaintext_res.unwrap());
 
             i += 1;
         }

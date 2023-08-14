@@ -16,16 +16,16 @@ fn main() -> Result<(), Error> {
     /*
      * Example of use for 15 items stored and a ciphertext size of 16 bytes.
      */
-    let nb_blocks: usize = 15;
-    let nb_leaves = (nb_blocks + 1) / 2;
-    let block_size: usize = 16;
+    let nb_items: usize = 15;
+    let nb_leaves = (nb_items + 1) / 2;
+    let ct_size: usize = 16;
 
     /*
      * Client.
      */
     let mut client = ClientORAM::new();
 
-    let dummies_result = client.generate_dummies(nb_blocks, block_size);
+    let dummies_result = client.generate_dummies(nb_items, ct_size);
 
     assert!(dummies_result.is_ok());
     let mut dummies = dummies_result.unwrap();
@@ -33,7 +33,7 @@ fn main() -> Result<(), Error> {
     /*
      * Server.
      */
-    let mut path_oram = ORAM::new(dummies.as_mut(), nb_blocks).unwrap();
+    let mut path_oram = ORAM::new(dummies.as_mut(), nb_items).unwrap();
 
     // Let's read path 3, of all 16 paths from 0 to 15 included.
     let path = 3;
@@ -49,9 +49,9 @@ fn main() -> Result<(), Error> {
 
     /*
      * Client side now.
-     * After decryption, change block number 6.
+     * After decryption, change item number 6.
      */
-    let decrypt_res = client.decrypt_blocks(&mut path_values);
+    let decrypt_res = client.decrypt_items(&mut path_values);
     if decrypt_res.is_err() {
         return Err(Error::new(
             ErrorKind::Interrupted,
@@ -62,7 +62,7 @@ fn main() -> Result<(), Error> {
     // Here path_values is a vector containing plaintexts.
 
     let encrypt_res =
-        client.encrypt_blocks(&mut path_values, [6].to_vec(), nb_leaves);
+        client.encrypt_items(&mut path_values, [6].to_vec(), nb_leaves);
     if encrypt_res.is_err() {
         return Err(Error::new(
             ErrorKind::Interrupted,
