@@ -10,7 +10,7 @@ use crate::{btree::DataItem, oram::BUCKET_SIZE};
 pub struct ClientORAM {
     pub stash: Vec<DataItem>,
     csprng: CsRng,
-    key: SymmetricKey<{ Aes256Gcm::KEY_LENGTH }>,
+    cipher: Aes256Gcm,
 }
 
 impl ClientORAM {
@@ -19,15 +19,13 @@ impl ClientORAM {
         let key = SymmetricKey::new(&mut csprng);
 
         ClientORAM {
-            // Empty stash at initialization.
+            /* Empty stash at initialization as described in
+             * `https://eprint.iacr.org/2013/280`.
+             */
             stash: Vec::new(),
             csprng,
-            key,
+            cipher: Aes256Gcm::new(&key),
         }
-    }
-
-    pub fn gen_key(&mut self) {
-        self.key = SymmetricKey::new(&mut self.csprng);
     }
 
     pub fn generate_dummies(
@@ -46,8 +44,6 @@ impl ClientORAM {
         let nb_leaves = (nb_dummies + 1) / 2;
         let mut dummies = Vec::new();
 
-        let cipher = Aes256Gcm::new(&self.key);
-
         // FIXME - encrypt fixed dummy value instead of encrypting randoms.
         for _ in 0..nb_dummies * BUCKET_SIZE {
             // Generate new random dummy data.
@@ -59,7 +55,7 @@ impl ClientORAM {
 
             // Encrypt dummies to provide correct MAC for later decryption.
             let ciphertext_res =
-                cipher.encrypt(&nonce, &dummy_data, Option::None);
+                self.cipher.encrypt(&nonce, &dummy_data, Option::None);
 
             if ciphertext_res.is_err() {
                 return Err(Error::new(
@@ -72,7 +68,7 @@ impl ClientORAM {
                 [nonce.as_bytes(), ciphertext_res.unwrap().as_slice()].concat();
 
             // FIXME- uniform generation for now. Is fine but dummies' paths do
-            // not need to be generated at random.
+            // not necessarily need to be generated at random.
             let path = self.csprng.gen_range(0..nb_leaves);
 
             dummies.push(DataItem::new(encrypted_dummy, path as u16));
@@ -87,16 +83,13 @@ impl ClientORAM {
         changed_items_idx: Vec<usize>,
         max_path: usize,
     ) -> Result<(), CryptoCoreError> {
-        self.gen_key();
-        let cipher = Aes256Gcm::new(&self.key);
-
         let mut i = 0;
         while i < items.len() {
             // Generate new nonce for encryption.
             let nonce = Nonce::new(&mut self.csprng);
 
             let ciphertext_res =
-                cipher.encrypt(&nonce, items[i].data(), Option::None);
+                self.cipher.encrypt(&nonce, items[i].data(), Option::None);
             if ciphertext_res.is_err() {
                 return Err(Result::unwrap_err(ciphertext_res));
             }
@@ -124,8 +117,6 @@ impl ClientORAM {
         &self,
         items: &mut Vec<DataItem>,
     ) -> Result<(), CryptoCoreError> {
-        let cipher = Aes256Gcm::new(&self.key);
-
         let mut i = 0;
         while i < items.len() {
             // Edge-case where dummies left cells uninitialized.
@@ -142,7 +133,7 @@ impl ClientORAM {
             }
 
             let nonce = nonce_res.unwrap();
-            let plaintext_res = cipher.decrypt(
+            let plaintext_res = self.cipher.decrypt(
                 &nonce,
                 &items[i].data()[Aes256Gcm::NONCE_LENGTH..],
                 Option::None,
