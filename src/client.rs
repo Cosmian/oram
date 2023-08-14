@@ -33,7 +33,7 @@ impl ClientOram {
     ) -> Result<Vec<DataItem>, CryptoCoreError> {
         // Number of leaves is 2^(l-1) if number of items is 2^l - 1.
         let nb_leaves = (nb_dummy_items + 1) / 2;
-        let mut dummy_items = Vec::new();
+        let mut dummy_items = Vec::with_capacity(nb_dummy_items);
 
         // FIXME - encrypt fixed dummy value instead of encrypting randoms.
         for _ in 0..nb_dummy_items {
