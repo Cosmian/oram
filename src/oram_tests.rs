@@ -2,8 +2,8 @@
 mod tests {
     use crate::{
         btree::Node,
-        client::ClientORAM,
-        oram::{AccessType, BUCKET_SIZE, ORAM},
+        client::ClientOram,
+        oram::{AccessType, Oram, BUCKET_SIZE},
     };
 
     fn _complete_tree_size(node: Option<&Box<Node>>) -> usize {
@@ -19,7 +19,7 @@ mod tests {
     fn complete_tree_size_zero() {
         let nb_items: usize = 0;
 
-        let path_oram = ORAM::new(&mut Vec::new(), nb_items);
+        let path_oram = Oram::new(&mut Vec::new(), nb_items);
         assert!(path_oram.is_err());
     }
 
@@ -27,7 +27,7 @@ mod tests {
     fn complete_tree_size_one() {
         let nb_items: usize = 1;
 
-        let path_oram = ORAM::new(&mut Vec::new(), nb_items);
+        let path_oram = Oram::new(&mut Vec::new(), nb_items);
 
         if let Ok(path_oram) = path_oram {
             let tree_size = _complete_tree_size(path_oram.tree().root.as_ref());
@@ -39,7 +39,7 @@ mod tests {
     fn complete_tree_size_pow_of_2() {
         let nb_items: usize = 32;
 
-        let path_oram = ORAM::new(&mut Vec::new(), nb_items);
+        let path_oram = Oram::new(&mut Vec::new(), nb_items);
 
         if let Ok(path_oram) = path_oram {
             let tree_size = _complete_tree_size(path_oram.tree().root.as_ref());
@@ -51,7 +51,7 @@ mod tests {
     fn complete_tree_size_exact() {
         let nb_items: usize = 15;
 
-        let path_oram = ORAM::new(&mut Vec::new(), nb_items);
+        let path_oram = Oram::new(&mut Vec::new(), nb_items);
 
         if let Ok(path_oram) = path_oram {
             let tree_size = _complete_tree_size(path_oram.tree().root.as_ref());
@@ -63,7 +63,7 @@ mod tests {
     fn complete_tree_size_rand() {
         let nb_items: usize = 26;
 
-        let path_oram = ORAM::new(&mut Vec::new(), nb_items);
+        let path_oram = Oram::new(&mut Vec::new(), nb_items);
 
         if let Ok(path_oram) = path_oram {
             let tree_size = _complete_tree_size(path_oram.tree().root.as_ref());
@@ -75,7 +75,7 @@ mod tests {
     fn access_bad_path() {
         let nb_items: usize = 15;
 
-        let path_oram = ORAM::new(&mut Vec::new(), nb_items);
+        let path_oram = Oram::new(&mut Vec::new(), nb_items);
 
         assert!(path_oram.is_ok());
 
@@ -92,7 +92,7 @@ mod tests {
     fn access_bad_path2() {
         let nb_items: usize = 15;
 
-        let path_oram = ORAM::new(&mut Vec::new(), nb_items);
+        let path_oram = Oram::new(&mut Vec::new(), nb_items);
 
         assert!(path_oram.is_ok());
 
@@ -109,7 +109,7 @@ mod tests {
     fn access_valid_path1() {
         let nb_items: usize = 15;
 
-        let res_oram = ORAM::new(&mut Vec::new(), nb_items);
+        let res_oram = Oram::new(&mut Vec::new(), nb_items);
 
         assert!(res_oram.is_ok());
         let mut path_oram = res_oram.unwrap();
@@ -123,7 +123,7 @@ mod tests {
     fn access_valid_path2() {
         let nb_items: usize = 15;
 
-        let res_oram = ORAM::new(&mut Vec::new(), nb_items);
+        let res_oram = Oram::new(&mut Vec::new(), nb_items);
 
         assert!(res_oram.is_ok());
         let mut path_oram = res_oram.unwrap();
@@ -137,7 +137,7 @@ mod tests {
     fn access_valid_path3() {
         let nb_items: usize = 15;
 
-        let res_oram = ORAM::new(&mut Vec::new(), nb_items);
+        let res_oram = Oram::new(&mut Vec::new(), nb_items);
 
         assert!(res_oram.is_ok());
         let mut path_oram = res_oram.unwrap();
@@ -151,7 +151,7 @@ mod tests {
     fn access_valid_path_write_data_none() {
         let nb_items: usize = 15;
 
-        let res_oram = ORAM::new(&mut Vec::new(), nb_items);
+        let res_oram = Oram::new(&mut Vec::new(), nb_items);
 
         assert!(res_oram.is_ok());
         let mut path_oram = res_oram.unwrap();
@@ -168,7 +168,7 @@ mod tests {
         let nb_leaves = (1 << (nb_items.ilog2() + 1)) / 2;
         let ct_size: usize = 16;
 
-        let mut client = ClientORAM::new();
+        let mut client = ClientOram::new();
 
         let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
@@ -178,7 +178,7 @@ mod tests {
         /*
          * Server.
          */
-        let res_oram = ORAM::new(&mut dummies, nb_items);
+        let res_oram = Oram::new(&mut dummies, nb_items);
 
         assert!(res_oram.is_ok());
         let mut path_oram = res_oram.unwrap();
@@ -235,7 +235,7 @@ mod tests {
         let nb_leaves = (1 << (nb_items.ilog2() + 1)) / 2;
         let ct_size: usize = 16;
 
-        let mut client = ClientORAM::new();
+        let mut client = ClientOram::new();
 
         let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
@@ -245,7 +245,7 @@ mod tests {
         /*
          * Server.
          */
-        let res_oram = ORAM::new(&mut dummies, nb_items);
+        let res_oram = Oram::new(&mut dummies, nb_items);
 
         assert!(res_oram.is_ok());
         let mut path_oram = res_oram.unwrap();
@@ -302,7 +302,7 @@ mod tests {
         let nb_leaves = (1 << (nb_items.ilog2() + 1)) / 2;
         let ct_size: usize = 16;
 
-        let mut client = ClientORAM::new();
+        let mut client = ClientOram::new();
 
         let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
@@ -312,7 +312,7 @@ mod tests {
         /*
          * Server.
          */
-        let res_oram = ORAM::new(&mut dummies, nb_items);
+        let res_oram = Oram::new(&mut dummies, nb_items);
 
         assert!(res_oram.is_ok());
         let mut path_oram = res_oram.unwrap();
@@ -372,7 +372,7 @@ mod tests {
         let nb_leaves = (1 << (nb_items.ilog2() + 1)) / 2;
         let ct_size: usize = 16;
 
-        let mut client = ClientORAM::new();
+        let mut client = ClientOram::new();
 
         let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
@@ -382,7 +382,7 @@ mod tests {
         /*
          * Server.
          */
-        let res_oram = ORAM::new(&mut dummies, nb_items);
+        let res_oram = Oram::new(&mut dummies, nb_items);
 
         assert!(res_oram.is_ok());
         let mut path_oram = res_oram.unwrap();
@@ -440,7 +440,7 @@ mod tests {
     fn generate_zero_dummies() {
         let nb_items = 0;
         let ct_size = 16;
-        let mut client = ClientORAM::new();
+        let mut client = ClientOram::new();
 
         let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
@@ -453,7 +453,7 @@ mod tests {
     fn generate_dummies_random_number() {
         let nb_items = 173;
         let ct_size = 16;
-        let mut client = ClientORAM::new();
+        let mut client = ClientOram::new();
 
         let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
@@ -464,7 +464,7 @@ mod tests {
     fn generate_dummies_small() {
         let nb_items = 15;
         let ct_size = 16;
-        let mut client = ClientORAM::new();
+        let mut client = ClientOram::new();
 
         let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
@@ -477,7 +477,7 @@ mod tests {
     fn generate_dummies_big() {
         let nb_items = (1 << 11) - 1;
         let ct_size = 16;
-        let mut client = ClientORAM::new();
+        let mut client = ClientOram::new();
 
         let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
@@ -490,7 +490,7 @@ mod tests {
     fn generate_dummies_null_ct_size() {
         let nb_items = 15;
         let ct_size = 0;
-        let mut client = ClientORAM::new();
+        let mut client = ClientOram::new();
 
         let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
@@ -505,7 +505,7 @@ mod tests {
     fn generate_dummies_tremendous_ct_size() {
         let nb_items = 15;
         let ct_size = 1000;
-        let mut client = ClientORAM::new();
+        let mut client = ClientOram::new();
 
         let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
@@ -521,7 +521,7 @@ mod tests {
         let nb_items: usize = 15;
         let nb_leaves = (1 << (nb_items.ilog2() + 1)) / 2;
         let ct_size = 16;
-        let mut client = ClientORAM::new();
+        let mut client = ClientOram::new();
 
         let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
@@ -559,7 +559,7 @@ mod tests {
         /*
          * Client.
          */
-        let mut client = ClientORAM::new();
+        let mut client = ClientOram::new();
 
         let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
@@ -569,7 +569,7 @@ mod tests {
         /*
          * Server.
          */
-        let mut path_oram = ORAM::new(dummies.as_mut(), nb_items).unwrap();
+        let mut path_oram = Oram::new(dummies.as_mut(), nb_items).unwrap();
 
         // Let's read path 3, of all 16 paths from 0 to 15 included.
         let path = 3;

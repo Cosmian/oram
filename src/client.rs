@@ -5,18 +5,18 @@ use cosmian_crypto_core::{
 };
 use rand::{Rng, RngCore};
 
-pub struct ClientORAM {
+pub struct ClientOram {
     pub stash: Vec<DataItem>,
     csprng: CsRng,
     cipher: Aes256Gcm,
 }
 
-impl ClientORAM {
-    pub fn new() -> ClientORAM {
+impl ClientOram {
+    pub fn new() -> ClientOram {
         let mut csprng = CsRng::from_entropy();
         let key = SymmetricKey::new(&mut csprng);
 
-        ClientORAM {
+        ClientOram {
             /* Empty stash at initialization as described in
              * `https://eprint.iacr.org/2013/280`.
              */
@@ -75,7 +75,7 @@ impl ClientORAM {
             let ciphertext =
                 self.cipher.encrypt(&nonce, items[i].data(), Option::None)?;
 
-            // Change element data to plaintext.
+            // Change element data to ciphertext.
             items[i]
                 .set_data([nonce.as_bytes(), ciphertext.as_slice()].concat());
 

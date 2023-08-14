@@ -4,16 +4,19 @@ mod oram;
 mod oram_tests;
 
 use crate::{
-    client::ClientORAM,
-    oram::{AccessType, ORAM},
+    client::ClientOram,
+    oram::{AccessType, Oram},
 };
 use std::io::{Error, ErrorKind};
 
 fn main() -> Result<(), Error> {
-    println!("Hello, Path-ORAM!");
+    println!("Hello, Path-Oram!");
 
     /*
-     * Example of use for 15 items stored and a ciphertext size of 16 bytes.
+     * Implementation from https://eprint.iacr.org/2013/280.
+     *
+     * Example of use for 15 items (size of complete tree) stored and a
+     * ciphertext size of 16 bytes.
      */
     let nb_items: usize = 15;
     let nb_leaves = (nb_items + 1) / 2;
@@ -22,17 +25,16 @@ fn main() -> Result<(), Error> {
     /*
      * Client.
      */
-    let mut client = ClientORAM::new();
+    let mut client = ClientOram::new();
 
-    let dummies_result = client.generate_dummy_items(nb_items, ct_size);
-
-    assert!(dummies_result.is_ok());
-    let mut dummies = dummies_result.unwrap();
+    let mut dummies = client
+        .generate_dummy_items(nb_items, ct_size)
+        .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
 
     /*
      * Server.
      */
-    let mut path_oram = ORAM::new(dummies.as_mut(), nb_items).unwrap();
+    let mut path_oram = Oram::new(&mut dummies, nb_items).unwrap();
 
     // Let's read path 3, of all 16 paths from 0 to 15 included.
     let path = 3;
@@ -76,7 +78,6 @@ fn main() -> Result<(), Error> {
      * Server sends back remnants items it could not load into the tree. They
      * constitute the new stash.
      */
-
     client.stash = path_values_remnants;
 
     Ok(())

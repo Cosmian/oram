@@ -8,15 +8,15 @@ pub enum AccessType {
     Write,
 }
 
-pub struct ORAM {
+pub struct Oram {
     tree: BTree,
 }
 
-impl ORAM {
+impl Oram {
     pub fn new(
         data_items: &mut Vec<DataItem>,
         nb_items: usize,
-    ) -> Result<ORAM, Error> {
+    ) -> Result<Oram, Error> {
         if nb_items == 0 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -24,7 +24,7 @@ impl ORAM {
             ));
         }
 
-        Ok(ORAM {
+        Ok(Oram {
             tree: BTree::init_new(data_items, nb_items),
         })
     }
@@ -50,7 +50,7 @@ impl ORAM {
             AccessType::Read => {
                 let mut path_items = Vec::new();
 
-                ORAM::read_path(
+                Oram::read_path(
                     self.tree.root.as_ref(),
                     &mut path_items,
                     path,
@@ -64,7 +64,7 @@ impl ORAM {
             AccessType::Write => {
                 if let Some(data) = data {
                     let tree_height = self.tree.height();
-                    ORAM::write_path(
+                    Oram::write_path(
                         self.tree.root.as_mut(),
                         data,
                         path,
@@ -114,7 +114,7 @@ impl ORAM {
             }
 
             if (path >> bit_shift) % 2 == 0 {
-                ORAM::read_path(
+                Oram::read_path(
                     node.left.as_ref(),
                     path_data,
                     path,
@@ -122,7 +122,7 @@ impl ORAM {
                     level + 1,
                 );
             } else {
-                ORAM::read_path(
+                Oram::read_path(
                     node.right.as_ref(),
                     path_data,
                     path,
@@ -156,7 +156,7 @@ impl ORAM {
             }
 
             if (path >> bit_shift) % 2 == 0 {
-                ORAM::write_path(
+                Oram::write_path(
                     node.left.as_mut(),
                     path_data,
                     path,
@@ -164,7 +164,7 @@ impl ORAM {
                     level + 1,
                 );
             } else {
-                ORAM::write_path(
+                Oram::write_path(
                     node.right.as_mut(),
                     path_data,
                     path,
@@ -192,7 +192,7 @@ impl ORAM {
                             && !path_data[j].data().is_empty()
                     {
                         // Remove element from vector once inserted.
-                        node.set_bucket_element(path_data.remove(j), i);
+                        node.set_bucket_element(path_data.swap_remove(j), i);
                         break;
                     }
                 }

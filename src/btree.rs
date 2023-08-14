@@ -52,7 +52,7 @@ impl BTree {
                  * is at an intersection with the current visit of the tree.
                  */
                 if data_items[j].path() >> (self.height - level - 1) == path {
-                    node.set_bucket_element(data_items.remove(j), i);
+                    node.set_bucket_element(data_items.swap_remove(j), i);
                     break;
                 }
             }
