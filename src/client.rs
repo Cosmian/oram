@@ -1,4 +1,4 @@
-use crate::{btree::DataItem, oram::BUCKET_SIZE};
+use crate::btree::DataItem;
 use cosmian_crypto_core::{
     reexport::rand_core::SeedableRng, Aes256Gcm, CryptoCoreError, CsRng, Dem,
     FixedSizeCBytes, Instantiable, Nonce, RandomFixedSizeCBytes, SymmetricKey,
@@ -45,15 +45,11 @@ impl ClientORAM {
             let nonce = Nonce::new(&mut self.csprng);
 
             // Encrypt dummies to provide correct MAC for later decryption.
-            let ciphertext_res =
-                self.cipher.encrypt(&nonce, &dummy_data, Option::None);
-
-            if ciphertext_res.is_err() {
-                return Err(Result::unwrap_err(ciphertext_res));
-            }
+            let encrypted_data =
+                self.cipher.encrypt(&nonce, &dummy_data, None)?;
 
             let encrypted_dummy =
-                [nonce.as_bytes(), ciphertext_res.unwrap().as_slice()].concat();
+                [nonce.as_bytes(), encrypted_data.as_slice()].concat();
 
             // FIXME- uniform generation for now. Is fine but dummies' paths do
             // not necessarily need to be generated at random.
@@ -76,16 +72,12 @@ impl ClientORAM {
             // Generate new nonce for encryption.
             let nonce = Nonce::new(&mut self.csprng);
 
-            let ciphertext_res =
-                self.cipher.encrypt(&nonce, items[i].data(), Option::None);
-            if ciphertext_res.is_err() {
-                return Err(Result::unwrap_err(ciphertext_res));
-            }
+            let ciphertext =
+                self.cipher.encrypt(&nonce, items[i].data(), Option::None)?;
 
             // Change element data to plaintext.
-            items[i].set_data(
-                [nonce.as_bytes(), ciphertext_res.unwrap().as_slice()].concat(),
-            );
+            items[i]
+                .set_data([nonce.as_bytes(), ciphertext.as_slice()].concat());
 
             /*
              * If the block is among the ones to change, change its path by
@@ -113,25 +105,17 @@ impl ClientORAM {
                 continue;
             }
 
-            let nonce_res = Nonce::try_from_slice(
+            let nonce = Nonce::try_from_slice(
                 &items[i].data()[..Aes256Gcm::NONCE_LENGTH],
-            );
-            if nonce_res.is_err() {
-                return Err(Result::unwrap_err(nonce_res));
-            }
+            )?;
 
-            let nonce = nonce_res.unwrap();
-            let plaintext_res = self.cipher.decrypt(
+            let plaintext = self.cipher.decrypt(
                 &nonce,
                 &items[i].data()[Aes256Gcm::NONCE_LENGTH..],
                 Option::None,
-            );
+            )?;
 
-            if plaintext_res.is_err() {
-                return Err(Result::unwrap_err(plaintext_res));
-            }
-
-            items[i].set_data(plaintext_res.unwrap());
+            items[i].set_data(plaintext);
 
             i += 1;
         }

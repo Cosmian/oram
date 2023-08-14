@@ -20,9 +20,10 @@ impl ORAM {
         if nb_items == 0 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                "Number of itemss shall not be null".to_string(),
+                "Number of items shall not be null".to_string(),
             ));
         }
+
         Ok(ORAM {
             tree: BTree::init_new(data_items, nb_items),
         })
