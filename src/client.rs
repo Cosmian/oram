@@ -1,11 +1,9 @@
+use crate::{btree::DataItem, oram::BUCKET_SIZE};
 use cosmian_crypto_core::{
     reexport::rand_core::SeedableRng, Aes256Gcm, CryptoCoreError, CsRng, Dem,
     FixedSizeCBytes, Instantiable, Nonce, RandomFixedSizeCBytes, SymmetricKey,
 };
 use rand::{Rng, RngCore};
-use std::io::{Error, ErrorKind};
-
-use crate::{btree::DataItem, oram::BUCKET_SIZE};
 
 pub struct ClientORAM {
     pub stash: Vec<DataItem>,
@@ -32,15 +30,7 @@ impl ClientORAM {
         &mut self,
         nb_dummy_items: usize,
         ct_size: usize,
-    ) -> Result<Vec<DataItem>, Error> {
-        if !(nb_dummy_items + 1).is_power_of_two() {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "Number of dummy items shall be power of 2 minus one"
-                    .to_string(),
-            ));
-        }
-
+    ) -> Result<Vec<DataItem>, CryptoCoreError> {
         // Number of leaves is 2^(l-1) if number of items is 2^l - 1.
         let nb_leaves = (nb_dummy_items + 1) / 2;
         let mut dummy_items = Vec::new();
@@ -59,10 +49,7 @@ impl ClientORAM {
                 self.cipher.encrypt(&nonce, &dummy_data, Option::None);
 
             if ciphertext_res.is_err() {
-                return Err(Error::new(
-                    ErrorKind::Interrupted,
-                    Result::unwrap_err(ciphertext_res).to_string(),
-                ));
+                return Err(Result::unwrap_err(ciphertext_res));
             }
 
             let encrypted_dummy =

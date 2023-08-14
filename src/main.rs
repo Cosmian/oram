@@ -3,12 +3,11 @@ mod client;
 mod oram;
 mod oram_tests;
 
-use std::io::{Error, ErrorKind};
-
 use crate::{
     client::ClientORAM,
     oram::{AccessType, ORAM},
 };
+use std::io::{Error, ErrorKind};
 
 fn main() -> Result<(), Error> {
     println!("Hello, Path-ORAM!");

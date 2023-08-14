@@ -450,14 +450,14 @@ mod tests {
     }
 
     #[test]
-    fn generate_dummies_bad_number() {
+    fn generate_dummies_random_number() {
         let nb_items = 173;
         let ct_size = 16;
         let mut client = ClientORAM::new();
 
         let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
-        assert!(dummies_res.is_err());
+        assert!(dummies_res.is_ok());
     }
 
     #[test]
