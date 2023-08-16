@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::{
-        btree::Node,
+        btree::{DataItem, Node},
         client::ClientOram,
         oram::{AccessType, Oram, BUCKET_SIZE},
     };
@@ -25,7 +25,7 @@ mod tests {
 
     #[test]
     fn complete_tree_size_one() {
-        let nb_items: usize = 1;
+        let nb_items: usize = BUCKET_SIZE;
 
         let path_oram = Oram::new(&mut Vec::new(), nb_items);
 
@@ -37,7 +37,7 @@ mod tests {
 
     #[test]
     fn complete_tree_size_pow_of_2() {
-        let nb_items: usize = 32;
+        let nb_items: usize = 32 * BUCKET_SIZE;
 
         let path_oram = Oram::new(&mut Vec::new(), nb_items);
 
@@ -49,19 +49,19 @@ mod tests {
 
     #[test]
     fn complete_tree_size_exact() {
-        let nb_items: usize = 15;
+        let nb_items: usize = 15 * BUCKET_SIZE;
 
         let path_oram = Oram::new(&mut Vec::new(), nb_items);
 
         if let Ok(path_oram) = path_oram {
             let tree_size = _complete_tree_size(path_oram.tree().root.as_ref());
-            assert_eq!(tree_size, nb_items);
+            assert_eq!(tree_size, 15);
         }
     }
 
     #[test]
     fn complete_tree_size_rand() {
-        let nb_items: usize = 26;
+        let nb_items: usize = 26 * BUCKET_SIZE;
 
         let path_oram = Oram::new(&mut Vec::new(), nb_items);
 
@@ -73,7 +73,7 @@ mod tests {
 
     #[test]
     fn access_bad_path() {
-        let nb_items: usize = 15;
+        let nb_items: usize = 15 * BUCKET_SIZE;
 
         let path_oram = Oram::new(&mut Vec::new(), nb_items);
 
@@ -90,7 +90,7 @@ mod tests {
 
     #[test]
     fn access_bad_path2() {
-        let nb_items: usize = 15;
+        let nb_items: usize = 15 * BUCKET_SIZE;
 
         let path_oram = Oram::new(&mut Vec::new(), nb_items);
 
@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn access_valid_path1() {
-        let nb_items: usize = 15;
+        let nb_items: usize = 15 * BUCKET_SIZE;
 
         let res_oram = Oram::new(&mut Vec::new(), nb_items);
 
@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn access_valid_path2() {
-        let nb_items: usize = 15;
+        let nb_items: usize = 15 * BUCKET_SIZE;
 
         let res_oram = Oram::new(&mut Vec::new(), nb_items);
 
@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     fn access_valid_path3() {
-        let nb_items: usize = 15;
+        let nb_items: usize = 15 * BUCKET_SIZE;
 
         let res_oram = Oram::new(&mut Vec::new(), nb_items);
 
@@ -149,7 +149,7 @@ mod tests {
 
     #[test]
     fn access_valid_path_write_data_none() {
-        let nb_items: usize = 15;
+        let nb_items: usize = 15 * BUCKET_SIZE;
 
         let res_oram = Oram::new(&mut Vec::new(), nb_items);
 
@@ -164,11 +164,10 @@ mod tests {
 
     #[test]
     fn read_write_access() {
-        let nb_items: usize = 15;
-        let nb_leaves = (1 << (nb_items.ilog2() + 1)) / 2;
+        let nb_items: usize = 15 * BUCKET_SIZE;
         let ct_size: usize = 16;
 
-        let mut client = ClientOram::new();
+        let mut client = ClientOram::new(nb_items);
 
         let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
@@ -202,7 +201,7 @@ mod tests {
         // Here path_values is a vector containing plaintexts.
 
         let encryption_res =
-            client.encrypt_items(&mut path_values, [6].to_vec(), nb_leaves);
+            client.encrypt_items(&mut path_values, [6].to_vec());
         assert!(encryption_res.is_ok());
 
         assert_ne!(path_values.len(), 0);
@@ -231,11 +230,10 @@ mod tests {
 
     #[test]
     fn read_write_access_no_change() {
-        let nb_items: usize = 15;
-        let nb_leaves = (1 << (nb_items.ilog2() + 1)) / 2;
+        let nb_items: usize = 15 * BUCKET_SIZE;
         let ct_size: usize = 16;
 
-        let mut client = ClientOram::new();
+        let mut client = ClientOram::new(nb_items);
 
         let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
@@ -271,7 +269,7 @@ mod tests {
         // Here path_values is a vector containing plaintexts.
 
         let encryption_res =
-            client.encrypt_items(&mut path_values, [].to_vec(), nb_leaves);
+            client.encrypt_items(&mut path_values, [].to_vec());
         assert!(encryption_res.is_ok());
 
         let res_access = path_oram.access(
@@ -298,11 +296,10 @@ mod tests {
 
     #[test]
     fn read_write_acess_few_changes() {
-        let nb_items: usize = 15;
-        let nb_leaves = (1 << (nb_items.ilog2() + 1)) / 2;
+        let nb_items: usize = 15 * BUCKET_SIZE;
         let ct_size: usize = 16;
 
-        let mut client = ClientOram::new();
+        let mut client = ClientOram::new(nb_items);
 
         let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
@@ -337,11 +334,8 @@ mod tests {
 
         // Here path_values is a vector containing plaintexts.
 
-        let encryption_res = client.encrypt_items(
-            &mut path_values,
-            [0, 3, 6, 9].to_vec(),
-            nb_leaves,
-        );
+        let encryption_res =
+            client.encrypt_items(&mut path_values, [0, 3, 6, 9].to_vec());
         assert!(encryption_res.is_ok());
 
         let res_access = path_oram.access(
@@ -368,11 +362,10 @@ mod tests {
 
     #[test]
     fn read_write_acess_all_changes() {
-        let nb_items: usize = 15;
-        let nb_leaves = (1 << (nb_items.ilog2() + 1)) / 2;
+        let nb_items: usize = 15 * BUCKET_SIZE;
         let ct_size: usize = 16;
 
-        let mut client = ClientOram::new();
+        let mut client = ClientOram::new(nb_items);
 
         let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
@@ -410,7 +403,6 @@ mod tests {
         let encryption_res = client.encrypt_items(
             &mut path_values,
             (0..number_of_items_read).into_iter().collect(),
-            nb_leaves,
         );
         assert!(encryption_res.is_ok());
 
@@ -438,9 +430,9 @@ mod tests {
 
     #[test]
     fn generate_zero_dummies() {
-        let nb_items = 0;
+        let nb_items: usize = 0;
         let ct_size = 16;
-        let mut client = ClientOram::new();
+        let mut client = ClientOram::new(nb_items);
 
         let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
@@ -451,9 +443,9 @@ mod tests {
 
     #[test]
     fn generate_dummies_random_number() {
-        let nb_items = 173;
+        let nb_items: usize = 173;
         let ct_size = 16;
-        let mut client = ClientOram::new();
+        let mut client = ClientOram::new(nb_items);
 
         let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
@@ -462,9 +454,9 @@ mod tests {
 
     #[test]
     fn generate_dummies_small() {
-        let nb_items = 15;
+        let nb_items: usize = 15;
         let ct_size = 16;
-        let mut client = ClientOram::new();
+        let mut client = ClientOram::new(nb_items);
 
         let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
@@ -475,9 +467,9 @@ mod tests {
 
     #[test]
     fn generate_dummies_big() {
-        let nb_items = (1 << 11) - 1;
+        let nb_items: usize = (1 << 11) - 1;
         let ct_size = 16;
-        let mut client = ClientOram::new();
+        let mut client = ClientOram::new(nb_items);
 
         let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
@@ -488,9 +480,9 @@ mod tests {
 
     #[test]
     fn generate_dummies_null_ct_size() {
-        let nb_items = 15;
+        let nb_items: usize = 15;
         let ct_size = 0;
-        let mut client = ClientOram::new();
+        let mut client = ClientOram::new(nb_items);
 
         let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
@@ -503,9 +495,9 @@ mod tests {
 
     #[test]
     fn generate_dummies_tremendous_ct_size() {
-        let nb_items = 15;
+        let nb_items: usize = 15;
         let ct_size = 1000;
-        let mut client = ClientOram::new();
+        let mut client = ClientOram::new(nb_items);
 
         let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
@@ -517,11 +509,35 @@ mod tests {
     }
 
     #[test]
+    fn decrypt_dummies() {
+        let nb_items: usize = 15;
+        let ct_size = 16;
+        let mut client = ClientOram::new(nb_items);
+
+        let dummies_res = client.generate_dummy_items(nb_items, ct_size);
+
+        assert!(dummies_res.is_ok());
+        let mut dummies = dummies_res.unwrap();
+        assert_eq!(dummies.len(), nb_items);
+
+        // Nonce + tag length.
+        assert_eq!(dummies[0].data().len(), ct_size + 12 + 16);
+
+        let decrypt_res = client.decrypt_items(&mut dummies);
+        assert!(decrypt_res.is_ok());
+
+        let null_vector: Vec<u8> = vec![0; ct_size];
+
+        dummies
+            .iter()
+            .for_each(|dummy| assert_eq!(dummy.data(), &null_vector));
+    }
+
+    #[test]
     fn client_decrypt_encrypt_items() {
         let nb_items: usize = 15;
-        let nb_leaves = (1 << (nb_items.ilog2() + 1)) / 2;
         let ct_size = 16;
-        let mut client = ClientOram::new();
+        let mut client = ClientOram::new(nb_items);
 
         let dummies_res = client.generate_dummy_items(nb_items, ct_size);
 
@@ -535,8 +551,7 @@ mod tests {
         let mut witness = Vec::new();
         dummies.iter().for_each(|e| witness.push(e.clone()));
 
-        let encryption_res =
-            client.encrypt_items(&mut dummies, [].to_vec(), nb_leaves);
+        let encryption_res = client.encrypt_items(&mut dummies, [].to_vec());
         assert!(encryption_res.is_ok());
 
         assert_ne!(dummies[0].data(), witness[0].data());
@@ -548,18 +563,50 @@ mod tests {
     }
 
     #[test]
+    fn client_encrypt_decrypt_stash() {
+        let nb_items: usize = 15;
+        let ct_size = 16;
+        let mut client = ClientOram::new(nb_items);
+
+        client.stash = vec![DataItem::new(vec![0; ct_size]); 4];
+
+        let stash_encrypt_res = client.encrypt_stash();
+        assert!(stash_encrypt_res.is_ok());
+
+        let null_vector: Vec<u8> = vec![0; ct_size];
+
+        assert_ne!(client.stash[0].data(), &null_vector);
+
+        let stash_decrypt_res = client.decrypt_stash();
+        assert!(stash_decrypt_res.is_ok());
+
+        assert_eq!(client.stash[0].data(), &null_vector);
+    }
+
+    #[test]
+    fn client_encrypt_decrypt_empty_stash() {
+        let nb_items: usize = 15;
+        let mut client = ClientOram::new(nb_items);
+
+        let stash_encrypt_res = client.encrypt_stash();
+        assert!(stash_encrypt_res.is_ok());
+
+        let stash_decrypt_res = client.decrypt_stash();
+        assert!(stash_decrypt_res.is_ok());
+    }
+
+    #[test]
     fn general_behavior() {
         /*
-         * Example of use for 15 items stored and a ciphertext size of 16 bytes.
+         * Example of use for 44 items stored and a ciphertext size of 16 bytes.
          */
-        let nb_items: usize = 15;
-        let nb_leaves = (nb_items + 1) / 2;
+        let nb_items: usize = 44;
         let ct_size: usize = 16;
 
         /*
          * Client.
          */
-        let mut client = ClientOram::new();
+        let mut client = ClientOram::new(nb_items);
 
         let dummies_result = client.generate_dummy_items(nb_items, ct_size);
 
@@ -592,8 +639,7 @@ mod tests {
 
         // Here path_values is a vector containing plaintexts.
 
-        let encrypt_res =
-            client.encrypt_items(&mut path_values, [6].to_vec(), nb_leaves);
+        let encrypt_res = client.encrypt_items(&mut path_values, [6].to_vec());
         assert!(encrypt_res.is_ok());
 
         /*

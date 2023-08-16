@@ -7,20 +7,28 @@ use rand::Rng;
 
 pub struct ClientOram {
     pub stash: Vec<DataItem>,
+    pub position_map: Vec<usize>,
     csprng: CsRng,
     cipher: Aes256Gcm,
 }
 
 impl ClientOram {
-    pub fn new() -> ClientOram {
+    pub fn new(nb_items: usize) -> ClientOram {
         let mut csprng = CsRng::from_entropy();
         let key = SymmetricKey::new(&mut csprng);
 
+        let mut stash_capacity: usize = 0;
+        if nb_items != 0 {
+            stash_capacity = (nb_items.ilog2() + 1) as usize;
+        }
+
         ClientOram {
-            /* Empty stash at initialization as described in
+            /*
+             * Empty stash at initialization as described in
              * `https://eprint.iacr.org/2013/280`.
              */
-            stash: Vec::new(),
+            stash: Vec::with_capacity(stash_capacity),
+            position_map: vec![0; nb_items],
             csprng,
             cipher: Aes256Gcm::new(&key),
         }
@@ -31,8 +39,6 @@ impl ClientOram {
         nb_dummy_items: usize,
         ct_size: usize,
     ) -> Result<Vec<DataItem>, CryptoCoreError> {
-        // Number of leaves is 2^(l-1) if number of items is 2^l - 1.
-        let nb_leaves = (nb_dummy_items + 1) / 2;
         let mut dummy_items = Vec::with_capacity(nb_dummy_items);
 
         for _ in 0..nb_dummy_items {
@@ -48,19 +54,31 @@ impl ClientOram {
             let encrypted_dummy =
                 [nonce.as_bytes(), encrypted_data.as_slice()].concat();
 
-            let path = self.csprng.gen_range(0..nb_leaves);
-
-            dummy_items.push(DataItem::new(encrypted_dummy, path));
+            dummy_items.push(DataItem::new(encrypted_dummy));
         }
 
         Ok(dummy_items)
+    }
+
+    /// Orders elements stack wise. Elements to be places first will be last in
+    /// the vector.
+    pub fn order_elements_for_writing(&self, path: usize) {
+        // TODO.
+    }
+
+    pub fn change_position(&mut self, i: usize) {
+        /*
+         * Number of leaves (max_path) is the previous power of two of the
+         * number of elements.
+         */
+        let max_path = 1 << self.position_map.len().ilog2();
+        self.position_map[i] = self.csprng.gen_range(0..max_path);
     }
 
     pub fn encrypt_items(
         &mut self,
         items: &mut [DataItem],
         changed_items_idx: Vec<usize>,
-        max_path: usize,
     ) -> Result<(), CryptoCoreError> {
         for (i, item) in items.iter_mut().enumerate() {
             // Generate new nonce for encryption.
@@ -76,8 +94,9 @@ impl ClientOram {
              * If the block is among the ones to have changed, change its path
              * by sampling a random uniform distribution.
              */
+            // FIXME - Belongs here ?
             if changed_items_idx.contains(&i) {
-                item.set_path(self.csprng.gen_range(0..max_path))
+                self.change_position(i);
             }
         }
 

@@ -5,7 +5,7 @@ mod oram_tests;
 
 use crate::{
     client::ClientOram,
-    oram::{AccessType, Oram},
+    oram::{AccessType, Oram, BUCKET_SIZE},
 };
 use std::io::{Error, ErrorKind};
 
@@ -15,17 +15,16 @@ fn main() -> Result<(), Error> {
     /*
      * Implementation from https://eprint.iacr.org/2013/280.
      *
-     * Example of use for 15 items (size of complete tree) stored and a
-     * ciphertext size of 16 bytes.
+     * Example of use for 60 items (it fills 15 nodes which is the size of a
+     * complete tree) and a ciphertext size of 16 bytes.
      */
-    let nb_items: usize = 15;
-    let nb_leaves = (nb_items + 1) / 2;
+    let nb_items: usize = 60;
     let ct_size: usize = 16;
 
     /*
      * Client.
      */
-    let mut client = ClientOram::new();
+    let mut client = ClientOram::new(nb_items);
 
     let mut dummies = client
         .generate_dummy_items(nb_items, ct_size)
@@ -34,7 +33,7 @@ fn main() -> Result<(), Error> {
     /*
      * Server.
      */
-    let mut path_oram = Oram::new(&mut dummies, nb_items).unwrap();
+    let mut path_oram = Oram::new(&mut dummies, nb_items)?;
 
     // Let's read path 3, of all 16 paths from 0 to 15 included.
     let path = 3;
@@ -68,7 +67,7 @@ fn main() -> Result<(), Error> {
 
     // Encrypt read items to write them back to the ORAM.
     client
-        .encrypt_items(&mut path_values, [6].to_vec(), nb_leaves)
+        .encrypt_items(&mut path_values, [6].to_vec())
         .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
 
     // Encrypt back the stash.

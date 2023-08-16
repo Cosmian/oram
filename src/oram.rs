@@ -41,7 +41,7 @@ impl Oram {
                 format!(
                     "Invalid path access. Got {}, expected in range 0..{}",
                     path,
-                    self.tree.height() - 1
+                    (1 << (self.tree.height() - 1)) - 1
                 ),
             ));
         }
@@ -179,21 +179,9 @@ impl Oram {
              * their new path is at an intersection with the old path.
              */
             for i in 0..BUCKET_SIZE {
-                for j in 0..path_data.len() {
-                    /*
-                     * If node bucket is empty (rare case where init could not
-                     * fill element) or if path intersects and element to insert
-                     * is not empty.
-                     */
-                    if node.bucket()[i].data().is_empty()
-                        || path_data[j].path() >> (height - level)
-                            == path >> (height - level)
-                            && !path_data[j].data().is_empty()
-                    {
-                        // Remove element from vector once inserted.
-                        node.set_bucket_element(path_data.swap_remove(j), i);
-                        break;
-                    }
+                // path_data must be a stack of items to write.
+                if let Some(data) = path_data.pop() {
+                    node.set_bucket_element(data, i);
                 }
             }
         }
