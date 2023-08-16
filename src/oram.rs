@@ -1,6 +1,5 @@
 use crate::btree::{BTree, DataItem, Node};
 use std::io::{Error, ErrorKind};
-use std::ops::{Deref, DerefMut};
 
 pub const BUCKET_SIZE: usize = 4;
 
@@ -9,56 +8,31 @@ pub enum AccessType {
     Write,
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct Stash {
-    stash: Vec<Vec<u8>>,
-}
-
-impl Deref for Stash {
-    type Target = [Vec<u8>];
-
-    fn deref(&self) -> &Self::Target {
-        &self.stash
-    }
-}
-
-impl DerefMut for Stash {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.stash
-    }
-}
-
-impl Stash {
-    pub fn new() -> Stash {
-        // Empty stash at initialization.
-        Stash { stash: Vec::new() }
-    }
-}
-
-pub struct ORAM {
+pub struct Oram {
     tree: BTree,
 }
 
-impl ORAM {
+impl Oram {
     pub fn new(
-        dummies: &mut Vec<DataItem>,
-        nb_blocks: usize,
-    ) -> Result<ORAM, Error> {
-        if nb_blocks == 0 {
+        data_items: &mut Vec<DataItem>,
+        nb_items: usize,
+    ) -> Result<Oram, Error> {
+        if nb_items == 0 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                "Number of blocks shall not be null".to_string(),
+                "Number of items shall not be null".to_string(),
             ));
         }
-        Ok(ORAM {
-            tree: BTree::init_new(dummies, nb_blocks),
+
+        Ok(Oram {
+            tree: BTree::init_new(data_items, nb_items),
         })
     }
 
     pub fn access(
         &mut self,
         op: AccessType,
-        path: u16,
+        path: usize,
         data: Option<&mut Vec<DataItem>>,
     ) -> Result<Option<Vec<DataItem>>, Error> {
         if path > (1 << (self.tree.height() - 1)) - 1 {
@@ -76,7 +50,7 @@ impl ORAM {
             AccessType::Read => {
                 let mut path_items = Vec::new();
 
-                ORAM::read_path(
+                Oram::read_path(
                     self.tree.root.as_ref(),
                     &mut path_items,
                     path,
@@ -90,7 +64,7 @@ impl ORAM {
             AccessType::Write => {
                 if let Some(data) = data {
                     let tree_height = self.tree.height();
-                    ORAM::write_path(
+                    Oram::write_path(
                         self.tree.root.as_mut(),
                         data,
                         path,
@@ -117,7 +91,7 @@ impl ORAM {
     fn read_path(
         node: Option<&Box<Node>>,
         path_data: &mut Vec<DataItem>,
-        path: u16,
+        path: usize,
         height: u16,
         level: u16,
     ) {
@@ -140,7 +114,7 @@ impl ORAM {
             }
 
             if (path >> bit_shift) % 2 == 0 {
-                ORAM::read_path(
+                Oram::read_path(
                     node.left.as_ref(),
                     path_data,
                     path,
@@ -148,7 +122,7 @@ impl ORAM {
                     level + 1,
                 );
             } else {
-                ORAM::read_path(
+                Oram::read_path(
                     node.right.as_ref(),
                     path_data,
                     path,
@@ -162,7 +136,7 @@ impl ORAM {
     fn write_path(
         node: Option<&mut Box<Node>>,
         path_data: &mut Vec<DataItem>,
-        path: u16,
+        path: usize,
         height: u16,
         level: u16,
     ) {
@@ -182,7 +156,7 @@ impl ORAM {
             }
 
             if (path >> bit_shift) % 2 == 0 {
-                ORAM::write_path(
+                Oram::write_path(
                     node.left.as_mut(),
                     path_data,
                     path,
@@ -190,7 +164,7 @@ impl ORAM {
                     level + 1,
                 );
             } else {
-                ORAM::write_path(
+                Oram::write_path(
                     node.right.as_mut(),
                     path_data,
                     path,
@@ -204,7 +178,6 @@ impl ORAM {
              * fill the buckets. Elements can only be written on the path if
              * their new path is at an intersection with the old path.
              */
-            // FIXME - one-liner possible ?
             for i in 0..BUCKET_SIZE {
                 for j in 0..path_data.len() {
                     /*
@@ -218,7 +191,7 @@ impl ORAM {
                             && !path_data[j].data().is_empty()
                     {
                         // Remove element from vector once inserted.
-                        node.set_bucket_element(path_data.remove(j), i);
+                        node.set_bucket_element(path_data.swap_remove(j), i);
                         break;
                     }
                 }
