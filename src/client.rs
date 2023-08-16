@@ -63,31 +63,28 @@ impl ClientOram {
 
     pub fn encrypt_items(
         &mut self,
-        items: &mut Vec<DataItem>,
+        items: &mut [DataItem],
         changed_items_idx: Vec<usize>,
         max_path: usize,
     ) -> Result<(), CryptoCoreError> {
-        let mut i = 0;
-        while i < items.len() {
+        for (i, item) in items.iter_mut().enumerate() {
             // Generate new nonce for encryption.
             let nonce = Nonce::new(&mut self.csprng);
 
             let ciphertext =
-                self.cipher.encrypt(&nonce, items[i].data(), Option::None)?;
+                self.cipher.encrypt(&nonce, item.data(), Option::None)?;
 
             // Change element data to ciphertext.
-            items[i]
-                .set_data([nonce.as_bytes(), ciphertext.as_slice()].concat());
+            item.set_data([nonce.as_bytes(), ciphertext.as_slice()].concat());
 
             /*
-             * If the block is among the ones to change, change its path by
-             * sampling a random uniform distribution.
+             * If the block is among the ones to have changed, change its path
+             * by sampling a random uniform distribution.
              */
+            // XXX - change all values' path ?
             if changed_items_idx.contains(&i) {
-                items[i].set_path(self.csprng.gen_range(0..max_path))
+                item.set_path(self.csprng.gen_range(0..max_path))
             }
-
-            i += 1;
         }
 
         Ok(())
@@ -95,29 +92,24 @@ impl ClientOram {
 
     pub fn decrypt_items(
         &self,
-        items: &mut Vec<DataItem>,
+        items: &mut [DataItem],
     ) -> Result<(), CryptoCoreError> {
-        let mut i = 0;
-        while i < items.len() {
+        for item in items {
             // Edge-case where dummies left cells uninitialized.
-            if items[i].data().is_empty() {
-                i += 1;
+            if item.data().is_empty() {
                 continue;
             }
 
-            let nonce = Nonce::try_from_slice(
-                &items[i].data()[..Aes256Gcm::NONCE_LENGTH],
-            )?;
+            let nonce =
+                Nonce::try_from_slice(&item.data()[..Aes256Gcm::NONCE_LENGTH])?;
 
             let plaintext = self.cipher.decrypt(
                 &nonce,
-                &items[i].data()[Aes256Gcm::NONCE_LENGTH..],
+                &item.data()[Aes256Gcm::NONCE_LENGTH..],
                 Option::None,
             )?;
 
-            items[i].set_data(plaintext);
-
-            i += 1;
+            item.set_data(plaintext);
         }
 
         Ok(())
