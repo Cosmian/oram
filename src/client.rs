@@ -3,7 +3,7 @@ use cosmian_crypto_core::{
     reexport::rand_core::SeedableRng, Aes256Gcm, CryptoCoreError, CsRng, Dem,
     FixedSizeCBytes, Instantiable, Nonce, RandomFixedSizeCBytes, SymmetricKey,
 };
-use rand::{Rng, RngCore};
+use rand::Rng;
 
 pub struct ClientOram {
     pub stash: Vec<DataItem>,
@@ -35,24 +35,19 @@ impl ClientOram {
         let nb_leaves = (nb_dummy_items + 1) / 2;
         let mut dummy_items = Vec::with_capacity(nb_dummy_items);
 
-        // FIXME - encrypt fixed dummy value instead of encrypting randoms.
         for _ in 0..nb_dummy_items {
-            // Generate new random dummy data.
-            let mut dummy_data = vec![0; ct_size];
-            self.csprng.fill_bytes(&mut dummy_data);
+            let dummy_data = vec![0; ct_size];
 
             // Generate new nonce for encryption.
             let nonce = Nonce::new(&mut self.csprng);
 
-            // Encrypt dummies to provide correct MAC for later decryption.
+            // Encrypt null vector as dummies.
             let encrypted_data =
                 self.cipher.encrypt(&nonce, &dummy_data, None)?;
 
             let encrypted_dummy =
                 [nonce.as_bytes(), encrypted_data.as_slice()].concat();
 
-            // FIXME- uniform generation for now. Is fine but dummies' paths do
-            // not necessarily need to be generated at random.
             let path = self.csprng.gen_range(0..nb_leaves);
 
             dummy_items.push(DataItem::new(encrypted_dummy, path));
@@ -81,7 +76,6 @@ impl ClientOram {
              * If the block is among the ones to have changed, change its path
              * by sampling a random uniform distribution.
              */
-            // XXX - change all values' path ?
             if changed_items_idx.contains(&i) {
                 item.set_path(self.csprng.gen_range(0..max_path))
             }
@@ -110,6 +104,40 @@ impl ClientOram {
             )?;
 
             item.set_data(plaintext);
+        }
+
+        Ok(())
+    }
+
+    pub fn encrypt_stash(&mut self) -> Result<(), CryptoCoreError> {
+        for stash_item in self.stash.iter_mut() {
+            let nonce = Nonce::new(&mut self.csprng);
+
+            let ciphertext =
+                self.cipher
+                    .encrypt(&nonce, stash_item.data(), Option::None)?;
+
+            // Change element data to ciphertext.
+            stash_item
+                .set_data([nonce.as_bytes(), ciphertext.as_slice()].concat());
+        }
+
+        Ok(())
+    }
+
+    pub fn decrypt_stash(&mut self) -> Result<(), CryptoCoreError> {
+        for stash_item in self.stash.iter_mut() {
+            let nonce = Nonce::try_from_slice(
+                &stash_item.data()[..Aes256Gcm::NONCE_LENGTH],
+            )?;
+
+            let plaintext = self.cipher.decrypt(
+                &nonce,
+                &stash_item.data()[Aes256Gcm::NONCE_LENGTH..],
+                Option::None,
+            )?;
+
+            stash_item.set_data(plaintext);
         }
 
         Ok(())

@@ -49,14 +49,31 @@ fn main() -> Result<(), Error> {
      * Client side now.
      * After decryption, change item number 6.
      */
+
+    // Decrypt values from tree here.
     client
         .decrypt_items(&mut path_values)
         .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
 
-    // Here path_values is a vector containing plaintexts.
+    // Decrypt client stash.
+    client
+        .decrypt_stash()
+        .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
 
+    /*
+     * Here path_values is a vector containing plaintexts.
+     * ...
+     * Do changes here.
+     */
+
+    // Encrypt read items to write them back to the ORAM.
     client
         .encrypt_items(&mut path_values, [6].to_vec(), nb_leaves)
+        .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
+
+    // Encrypt back the stash.
+    client
+        .encrypt_stash()
         .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
 
     /*
@@ -68,7 +85,7 @@ fn main() -> Result<(), Error> {
     let path_values_remnants_opt = path_oram.access(
         AccessType::Write,
         path,
-        Some(&mut [path_values, client.stash].concat()),
+        Some(&mut [client.stash, path_values].concat()),
     )?;
 
     assert!(path_values_remnants_opt.is_some());

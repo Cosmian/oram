@@ -178,7 +178,6 @@ impl Oram {
              * fill the buckets. Elements can only be written on the path if
              * their new path is at an intersection with the old path.
              */
-            // FIXME - one-liner possible ?
             for i in 0..BUCKET_SIZE {
                 for j in 0..path_data.len() {
                     /*
