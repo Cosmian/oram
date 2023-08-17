@@ -11,7 +11,6 @@ impl BTree {
         let mut tree = BTree {
             root: Option::None,
             height: (nb_items / BUCKET_SIZE).ilog2() as u16 + 1,
-            //height: nb_items.ilog2() as u16 + 1,
         };
 
         let mut root = Node::new();
@@ -70,16 +69,20 @@ impl Node {
             left: Option::None,
             right: Option::None,
             bucket: [
-                DataItem::new(Vec::new()),
-                DataItem::new(Vec::new()),
-                DataItem::new(Vec::new()),
-                DataItem::new(Vec::new()),
+                DataItem::default(),
+                DataItem::default(),
+                DataItem::default(),
+                DataItem::default(),
             ],
         }
     }
 
     pub fn bucket(&self) -> &[DataItem; BUCKET_SIZE] {
         &self.bucket
+    }
+
+    pub fn set_bucket(&mut self, bucket: [DataItem; BUCKET_SIZE]) {
+        self.bucket = bucket;
     }
 
     pub fn set_bucket_element(&mut self, elt: DataItem, i: usize) {
@@ -90,6 +93,12 @@ impl Node {
 #[derive(Debug, Clone, Default)]
 pub struct DataItem {
     data: Vec<u8>,
+}
+
+impl PartialEq for DataItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.data == other.data
+    }
 }
 
 impl DataItem {

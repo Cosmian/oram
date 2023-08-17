@@ -5,7 +5,7 @@ mod oram_tests;
 
 use crate::{
     client::ClientOram,
-    oram::{AccessType, Oram, BUCKET_SIZE},
+    oram::{AccessType, Oram},
 };
 use std::io::{Error, ErrorKind};
 
@@ -61,13 +61,23 @@ fn main() -> Result<(), Error> {
 
     /*
      * Here path_values is a vector containing plaintexts.
-     * ...
-     * Do changes here.
      */
+
+    // Change item 6 for example.
+    //client.change_element_position(&path_values[6])?;
+
+    // Stash and elements read from path are combined and ordered.
+    let mut ordered_elements = client.order_elements_for_writing(
+        &path_values,
+        path,
+        path_oram.tree().height() as usize,
+    );
+
+    println!("{:?}", ordered_elements);
 
     // Encrypt read items to write them back to the ORAM.
     client
-        .encrypt_items(&mut path_values, [6].to_vec())
+        .encrypt_items(&mut ordered_elements)
         .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
 
     // Encrypt back the stash.
@@ -84,17 +94,16 @@ fn main() -> Result<(), Error> {
     let path_values_remnants_opt = path_oram.access(
         AccessType::Write,
         path,
-        Some(&mut [client.stash, path_values].concat()),
+        Some(&mut ordered_elements),
     )?;
-
-    assert!(path_values_remnants_opt.is_some());
-    let path_values_remnants = path_values_remnants_opt.unwrap();
 
     /*
      * Server sends back remnants items it could not load into the tree. They
      * constitute the new stash.
      */
-    client.stash = path_values_remnants;
+    if let Some(stash) = path_values_remnants_opt {
+        client.stash = stash;
+    }
 
     Ok(())
 }

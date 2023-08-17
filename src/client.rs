@@ -1,13 +1,18 @@
-use crate::btree::DataItem;
+use crate::{btree::DataItem, oram::BUCKET_SIZE};
 use cosmian_crypto_core::{
     reexport::rand_core::SeedableRng, Aes256Gcm, CryptoCoreError, CsRng, Dem,
     FixedSizeCBytes, Instantiable, Nonce, RandomFixedSizeCBytes, SymmetricKey,
 };
 use rand::Rng;
+use std::{
+    collections::HashMap,
+    io::{Error, ErrorKind},
+};
 
 pub struct ClientOram {
     pub stash: Vec<DataItem>,
-    pub position_map: Vec<usize>,
+    pub position_map: HashMap<Vec<u8>, usize>,
+    nb_items: usize,
     csprng: CsRng,
     cipher: Aes256Gcm,
 }
@@ -28,7 +33,8 @@ impl ClientOram {
              * `https://eprint.iacr.org/2013/280`.
              */
             stash: Vec::with_capacity(stash_capacity),
-            position_map: vec![0; nb_items],
+            position_map: HashMap::with_capacity(nb_items),
+            nb_items,
             csprng,
             cipher: Aes256Gcm::new(&key),
         }
@@ -60,43 +66,104 @@ impl ClientOram {
         Ok(dummy_items)
     }
 
-    /// Orders elements stack wise. Elements to be places first will be last in
+    /// Orders elements stack wise. Elements to be placed first will be last in
     /// the vector.
-    pub fn order_elements_for_writing(&self, path: usize) {
-        // TODO.
+    pub fn order_elements_for_writing(
+        &mut self,
+        elts: &Vec<DataItem>,
+        path: usize,
+        tree_height: usize,
+    ) -> Vec<[DataItem; BUCKET_SIZE]> {
+        let mut ordered_elements: Vec<[DataItem; BUCKET_SIZE]> =
+            Vec::with_capacity(tree_height);
+
+        let size = elts[0].data().len();
+
+        let mut elements = [self.stash.as_slice(), elts.as_slice()].concat();
+
+        for level in (0..tree_height).rev() {
+            let mut bucket = [
+                DataItem::default(),
+                DataItem::default(),
+                DataItem::default(),
+                DataItem::default(),
+            ];
+
+            for i in 0..BUCKET_SIZE {
+                for (j, data_item) in elements.iter().enumerate() {
+                    if let Some(&data_item_path) =
+                        self.position_map.get(data_item.data())
+                    {
+                        if data_item_path >> level == path >> level {
+                            bucket[i] = elements.remove(j);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            bucket.iter_mut().for_each(|data_item| {
+                if data_item.data().is_empty() {
+                    data_item.set_data(vec![0; size]);
+                }
+            });
+
+            ordered_elements.push(bucket);
+        }
+
+        /*
+         * The elements that are not inserted at this point is because there are
+         * more elements to write than slots in the path. They consitute the new
+         * stash.
+         */
+
+        self.stash = elements
+            .into_iter()
+            .filter(|data_item| {
+                self.position_map.contains_key(data_item.data())
+            })
+            .collect();
+
+        ordered_elements
     }
 
-    pub fn change_position(&mut self, i: usize) {
+    pub fn change_element_position(
+        &mut self,
+        elt: &DataItem,
+    ) -> Result<(), Error> {
         /*
          * Number of leaves (max_path) is the previous power of two of the
          * number of elements.
          */
-        let max_path = 1 << self.position_map.len().ilog2();
-        self.position_map[i] = self.csprng.gen_range(0..max_path);
+        let max_path = 1 << (self.nb_items / BUCKET_SIZE).ilog2();
+
+        let position =
+            self.position_map.get_mut(elt.data()).ok_or(Error::new(
+                ErrorKind::Interrupted,
+                format!("Error: element {:?} is not in the position map.", elt),
+            ))?;
+
+        *position = self.csprng.gen_range(0..max_path);
+
+        Ok(())
     }
 
     pub fn encrypt_items(
         &mut self,
-        items: &mut [DataItem],
-        changed_items_idx: Vec<usize>,
+        buckets: &mut Vec<[DataItem; BUCKET_SIZE]>,
     ) -> Result<(), CryptoCoreError> {
-        for (i, item) in items.iter_mut().enumerate() {
-            // Generate new nonce for encryption.
-            let nonce = Nonce::new(&mut self.csprng);
+        for bucket in buckets {
+            for item in bucket {
+                // Generate new nonce for encryption.
+                let nonce = Nonce::new(&mut self.csprng);
 
-            let ciphertext =
-                self.cipher.encrypt(&nonce, item.data(), Option::None)?;
+                let ciphertext =
+                    self.cipher.encrypt(&nonce, item.data(), Option::None)?;
 
-            // Change element data to ciphertext.
-            item.set_data([nonce.as_bytes(), ciphertext.as_slice()].concat());
-
-            /*
-             * If the block is among the ones to have changed, change its path
-             * by sampling a random uniform distribution.
-             */
-            // FIXME - Belongs here ?
-            if changed_items_idx.contains(&i) {
-                self.change_position(i);
+                // Change element data to ciphertext.
+                item.set_data(
+                    [nonce.as_bytes(), ciphertext.as_slice()].concat(),
+                );
             }
         }
 

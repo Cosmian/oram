@@ -33,7 +33,7 @@ impl Oram {
         &mut self,
         op: AccessType,
         path: usize,
-        data: Option<&mut Vec<DataItem>>,
+        data: Option<&mut Vec<[DataItem; BUCKET_SIZE]>>,
     ) -> Result<Option<Vec<DataItem>>, Error> {
         if path > (1 << (self.tree.height() - 1)) - 1 {
             return Err(Error::new(
@@ -72,11 +72,7 @@ impl Oram {
                         0,
                     );
 
-                    /*
-                     * Remnants elements could not be stored in the tree, they
-                     * represent the new stash (client-side).
-                     */
-                    return Ok(Some(data.to_vec()));
+                    return Ok(None);
                 }
 
                 Err(Error::new(
@@ -135,7 +131,7 @@ impl Oram {
 
     fn write_path(
         node: Option<&mut Box<Node>>,
-        path_data: &mut Vec<DataItem>,
+        path_data: &mut Vec<[DataItem; BUCKET_SIZE]>,
         path: usize,
         height: u16,
         level: u16,
@@ -178,11 +174,8 @@ impl Oram {
              * fill the buckets. Elements can only be written on the path if
              * their new path is at an intersection with the old path.
              */
-            for i in 0..BUCKET_SIZE {
-                // path_data must be a stack of items to write.
-                if let Some(data) = path_data.pop() {
-                    node.set_bucket_element(data, i);
-                }
+            if let Some(bucket) = path_data.pop() {
+                node.set_bucket(bucket);
             }
         }
     }
