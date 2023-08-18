@@ -196,7 +196,6 @@ mod tests {
 
         /*
          * Client side now.
-         * After decryption, change item number 6.
          */
         let decryption_res = client.decrypt_items(&mut path_values);
         assert!(decryption_res.is_ok());
@@ -207,11 +206,16 @@ mod tests {
         let mut new_value = vec![0; 3];
         csprng.fill_bytes(&mut new_value);
 
-        let new_item = DataItem::new(new_value.clone());
-        client.position_map.insert(new_value, 0);
+        client.position_map.insert(new_value.clone(), 0);
+        let new_item = DataItem::new(new_value);
 
         let chg_res = client.change_element_position(&new_item);
         assert!(chg_res.is_ok());
+
+        /* Manually insert an element in the stash to check if it empties after
+         * ordering elements.
+         */
+        client.stash.push(DataItem::new(vec![0; 10]));
 
         let mut ordered_elements = client.order_elements_for_writing(
             &[path_values.as_slice(), &[new_item]].concat(),
@@ -219,8 +223,11 @@ mod tests {
             path_oram.tree().height() as usize,
         );
 
-        assert_eq!(ordered_elements[0].len(), 1);
-        assert_eq!(ordered_elements.len(), 4);
+        assert_eq!(ordered_elements.len(), path_oram.tree().height() as usize);
+        assert_eq!(ordered_elements[0].len(), BUCKET_SIZE);
+        // Since ordering elements for writing also sets the stash, it should be
+        // empty here.
+        assert!(client.stash.is_empty());
 
         let encryption_res = client.encrypt_items(&mut ordered_elements);
         assert!(encryption_res.is_ok());
@@ -278,14 +285,22 @@ mod tests {
 
         // Here path_values is a vector containing plaintexts.
 
+        /* Manually insert an element in the stash to check if it empties after
+         * ordering elements.
+         */
+        client.stash.push(DataItem::new(vec![0; 10]));
+
         let mut ordered_elements = client.order_elements_for_writing(
             &path_values,
             path,
             path_oram.tree().height() as usize,
         );
 
-        assert_eq!(ordered_elements[0].len(), 0);
-        assert_eq!(ordered_elements.len(), 4);
+        assert_eq!(ordered_elements.len(), path_oram.tree().height() as usize);
+        assert_eq!(ordered_elements[0].len(), BUCKET_SIZE);
+        // Since ordering elements for writing also sets the stash, it should be
+        // empty here.
+        assert!(client.stash.is_empty());
 
         let encryption_res = client.encrypt_items(&mut ordered_elements);
         assert!(encryption_res.is_ok());
@@ -358,11 +373,22 @@ mod tests {
             new_values.push(data_item);
         }
 
+        /* Manually insert an element in the stash to check if it empties after
+         * ordering elements.
+         */
+        client.stash.push(DataItem::new(vec![0; 10]));
+
         let mut ordered_elements = client.order_elements_for_writing(
             &[path_values.as_slice(), new_values.as_slice()].concat(),
             path,
             path_oram.tree().height() as usize,
         );
+
+        assert_eq!(ordered_elements.len(), path_oram.tree().height() as usize);
+        assert_eq!(ordered_elements[0].len(), BUCKET_SIZE);
+        // Since ordering elements for writing also sets the stash, it should be
+        // empty here.
+        assert!(client.stash.is_empty());
 
         let encryption_res = client.encrypt_items(&mut ordered_elements);
         assert!(encryption_res.is_ok());
@@ -410,7 +436,6 @@ mod tests {
 
         /*
          * Client side now.
-         * After decryption, RESTORE EVERYTHING.
          */
         let decryption_res = client.decrypt_items(&mut path_values);
         assert!(decryption_res.is_ok());
@@ -438,6 +463,13 @@ mod tests {
             path_oram.tree().height() as usize,
         );
 
+        assert_eq!(ordered_elements.len(), path_oram.tree().height() as usize);
+        assert_eq!(ordered_elements[0].len(), BUCKET_SIZE);
+
+        // Stash should not be empty. The contrary could happen but with
+        // negligible probability.
+        assert!(!client.stash.is_empty());
+
         let encryption_res = client.encrypt_items(&mut ordered_elements);
         assert!(encryption_res.is_ok());
 
@@ -449,8 +481,7 @@ mod tests {
 
         assert!(res_access.is_ok());
         let path_values_opt = res_access.unwrap();
-        assert!(path_values_opt.is_some());
-        //let stash = path_values_opt.unwrap();
+        assert!(path_values_opt.is_none());
     }
 
     #[test]
@@ -685,10 +716,10 @@ mod tests {
         );
 
         assert_eq!(ordered_buckets.len(), tree_height);
-        assert_eq!(ordered_buckets[0].len(), 4);
-        assert_eq!(ordered_buckets[1].len(), 4);
-        assert_eq!(ordered_buckets[2].len(), 1);
-        assert_eq!(ordered_buckets[3].len(), 2);
+        assert_eq!(ordered_buckets[0].len(), BUCKET_SIZE);
+        assert_eq!(ordered_buckets[1].len(), BUCKET_SIZE);
+        assert_eq!(ordered_buckets[2].len(), BUCKET_SIZE);
+        assert_eq!(ordered_buckets[3].len(), BUCKET_SIZE);
 
         let empty = DataItem::new(vec![0; 3]);
 
@@ -784,9 +815,12 @@ mod tests {
     #[test]
     fn general_behavior() {
         /*
-         * Example of use for 18 items stored and a ciphertext size of 16 bytes.
+         * Example of use for 183 items stored and a ciphertext size of 16 bytes.
+         * This means that there will be floor(183/4) = 46 nodes to hold those
+         * items which completes to 63 nodes for the tree. There will then be 32
+         * leaves.
          */
-        let nb_items: usize = 18;
+        let nb_items: usize = 182;
         let ct_size: usize = 16;
 
         /*
@@ -794,125 +828,100 @@ mod tests {
          */
         let mut client = ClientOram::new(nb_items);
 
-        let elt1: Vec<u8> = [66, 114, 117].to_vec();
-        let elt2: Vec<u8> = [99, 101, 32].to_vec();
-        let elt3: Vec<u8> = [32, 83, 99].to_vec();
-        let elt4: Vec<u8> = [104, 110, 101].to_vec();
-        let elt5: Vec<u8> = [105, 101, 114].to_vec();
-        let elt6: Vec<u8> = [32, 107, 101].to_vec();
-        let elt7: Vec<u8> = [101, 112, 115].to_vec();
-        let elt8: Vec<u8> = [32, 99, 111].to_vec();
-        let elt9: Vec<u8> = [110, 115, 116].to_vec();
-        let elt10: Vec<u8> = [97, 110, 116].to_vec();
-        let elt11: Vec<u8> = [32, 116, 105].to_vec();
-
-        client.position_map.insert(elt1.clone(), 0);
-        client.position_map.insert(elt2.clone(), 1);
-        client.position_map.insert(elt3.clone(), 4);
-        client.position_map.insert(elt4.clone(), 4);
-        client.position_map.insert(elt5.clone(), 2);
-        client.position_map.insert(elt6.clone(), 3);
-        client.position_map.insert(elt7.clone(), 6);
-        client.position_map.insert(elt8.clone(), 1);
-        client.position_map.insert(elt9.clone(), 3);
-        client.position_map.insert(elt10.clone(), 0);
-        client.position_map.insert(elt11.clone(), 5);
-
-        let values = vec![
-            DataItem::new(elt1),
-            DataItem::new(elt2),
-            DataItem::new(elt3),
-            DataItem::new(elt4),
-            DataItem::new(elt5),
-            DataItem::new(elt6),
-            DataItem::new(elt7),
-            DataItem::new(elt8),
-            DataItem::new(elt9),
-            DataItem::new(elt10),
-            DataItem::new(elt11),
-        ];
-
-        let dummies_result =
-            client.generate_dummy_items(nb_items - 12, ct_size);
-
-        assert!(dummies_result.is_ok());
-        let dummies = dummies_result.unwrap();
+        let res_dummies = client.generate_dummy_items(nb_items, ct_size);
+        assert!(res_dummies.is_ok());
+        let mut dummies = res_dummies.unwrap();
 
         /*
          * Server.
          */
-        let mut path_oram = Oram::new(
-            &mut [values.as_slice(), dummies.as_slice()].concat(),
-            nb_items,
-        )
-        .unwrap();
+        let res_oram = Oram::new(&mut dummies, nb_items);
+        assert!(res_oram.is_ok());
+        let mut path_oram = res_oram.unwrap();
 
-        // Let's read path 3, of all 16 paths from 0 to 15 included.
-        let path = 3;
+        // Let's read path number 22.
+        let path = 22;
 
-        let path_values_result =
-            path_oram.access(AccessType::Read, path, Option::None);
+        let res_access = path_oram.access(AccessType::Read, path, Option::None);
+        assert!(res_access.is_ok());
+        let opt_access = res_access.unwrap();
+        assert!(opt_access.is_some());
 
-        assert!(path_values_result.is_ok());
-        let path_values_option = path_values_result.unwrap();
-
-        assert!(path_values_option.is_some());
-        let mut path_values = path_values_option.unwrap();
+        // This is the data we read from the ORAM, only dummies at this point.
+        let mut read_data = opt_access.unwrap();
 
         /*
-         * Client side now.
-         * After decryption, change item number 6.
+         * We received server response. Moving client side...
          */
-        let decrypt_res = client.decrypt_items(&mut path_values);
+
+        // Decrypt them nonetheless.
+        let decrypt_res = client.decrypt_items(&mut read_data);
         assert!(decrypt_res.is_ok());
 
-        // Here path_values is a vector containing plaintexts.
-        let res_chg = client.change_element_position(&path_values[6]);
-        assert!(res_chg.is_ok());
+        // Decrypt client stash.
+        let stsh_dec_res = client.decrypt_stash();
+        assert!(stsh_dec_res.is_ok());
+
+        // Now read_data contains plaintext values. Decrypted dummy is null.
+        assert!(!read_data[9].data().is_empty());
+        let null_vector: Vec<u8> = vec![0; ct_size];
+        assert_eq!(read_data[9].data(), &null_vector);
+
+        // Let's add some real data to our position map now.
+        let mut csprng = CsRng::from_entropy();
+        let mut new_values = Vec::with_capacity(50);
+
+        for _ in 0..26 {
+            let mut rand_value = vec![0; ct_size];
+            csprng.fill_bytes(&mut rand_value);
+            let data_item = DataItem::new(rand_value.clone());
+
+            client.position_map.insert(rand_value.clone(), 0);
+
+            let res_chg = client.change_element_position(&data_item);
+            assert!(res_chg.is_ok());
+
+            new_values.push(data_item);
+        }
 
         let mut ordered_elements = client.order_elements_for_writing(
-            &path_values,
+            &[new_values.as_slice(), read_data.as_slice()].concat(),
             path,
             path_oram.tree().height() as usize,
         );
 
-        let encrypt_res = client.encrypt_items(&mut ordered_elements);
-        assert!(encrypt_res.is_ok());
+        /* We ordered elements and put the ones that could not be written in the
+         * stash. Since we want to write 26 elements and a path can only contain
+         * tree.height * BUCKET_SIZE = 6 * 4 (here) = 24 elements, the stash has
+         * to be not empty. However, its size can vary since we assigned paths
+         * at random.
+         */
+        assert!(!client.stash.is_empty());
+
+        assert_eq!(ordered_elements.len(), path_oram.tree().height() as usize);
+        assert_eq!(ordered_elements[0].len(), BUCKET_SIZE);
+
+        // Encrypt read items to write them back to the ORAM.
+        let enc_res = client.encrypt_items(&mut ordered_elements);
+        assert!(enc_res.is_ok());
+
+        // Encrypt back the stash.
+        let stsh_enc_res = client.encrypt_stash();
+        assert!(stsh_enc_res.is_ok());
 
         /*
-         * Each Read operation **must** be followed by a write operation on the
-         * same path. Client sends new DataItems to write to the tree alongside
-         * with his current stash.
-         * Server side.
+         * Sending data to the server for writing...
          */
-        let path_values_remnants_res = path_oram.access(
+
+        // Write ordered elements to the same path.
+        let res_write = path_oram.access(
             AccessType::Write,
             path,
             Some(&mut ordered_elements),
         );
 
-        assert!(path_values_remnants_res.is_ok());
-        let path_values_remnants_opt = path_values_remnants_res.unwrap();
-
-        assert!(path_values_remnants_opt.is_some());
-        let stash = path_values_remnants_opt.unwrap();
-
-        /*
-         * Server sends back remnants items it could not load into the tree.
-         * They constitute the new stash.
-         */
-
-        client.stash = stash;
-
-        // Path-Oram success.
-        assert!(
-            client
-                .stash
-                .iter()
-                .filter(|remnant| !remnant.data().is_empty())
-                .collect::<Vec<_>>()
-                .len()
-                < path_oram.tree().height() as usize * BUCKET_SIZE
-        );
+        assert!(res_write.is_ok());
+        let opt_write = res_write.unwrap();
+        assert!(opt_write.is_none());
     }
 }

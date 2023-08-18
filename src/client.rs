@@ -81,7 +81,7 @@ impl ClientOram {
 
         let mut elements = [self.stash.as_slice(), elts.as_slice()].concat();
 
-        for level in (0..tree_height).rev() {
+        for level in 0..tree_height {
             let mut bucket = [
                 DataItem::default(),
                 DataItem::default(),
@@ -123,6 +123,14 @@ impl ClientOram {
                 self.position_map.contains_key(data_item.data())
             })
             .collect();
+
+        /*
+         * List is reversed here since when writing to the tree, elements are
+         * popped stackwise. I doubt this can be directly constructed in reverse
+         * since elements are pushed in the vector following less and less
+         * strict conditions (path right shifting more and more).
+         */
+        ordered_elements.reverse();
 
         ordered_elements
     }
