@@ -6,8 +6,5 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-<<<<<<< HEAD
-=======
 cosmian_crypto_core = { version = "9.0.1", default-features = false, features=["aes"] }
 rand = "0.8.5"
->>>>>>> 1fae9af ([gitignore] Added rust format setting files to gitignore)
