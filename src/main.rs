@@ -50,6 +50,12 @@ fn main() -> Result<(), Error> {
     let path = 22;
     let mut read_data = client.read_from_path(&mut oram, path)?;
 
+    // Let's insert the new values upon writing.
+    client.write_to_path(&mut oram, &mut read_data, Some(new_values), path)?;
+
+    // Let's make another read.
+    read_data = client.read_from_path(&mut oram, path)?;
+
     /* Changing an element in the values obtained */
     /* -------------------------------------------*/
     let idx_data_item_to_change = 6;
@@ -65,7 +71,7 @@ fn main() -> Result<(), Error> {
     client.insert_element_in_position_map(&read_data[idx_data_item_to_change]);
     /* -------------------------------------------*/
 
-    // I don't wish to insert new elements there.
+    // Not inserting anything new this time.
     client.write_to_path(&mut oram, &mut read_data, Option::None, path)?;
 
     Ok(())
