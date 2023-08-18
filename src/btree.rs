@@ -110,6 +110,10 @@ impl DataItem {
         &self.data
     }
 
+    pub fn data_as_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.data
+    }
+
     pub fn set_data(&mut self, data: Vec<u8>) {
         self.data = data;
     }
