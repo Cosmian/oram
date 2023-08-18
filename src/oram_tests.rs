@@ -218,7 +218,7 @@ mod tests {
         client.stash.push(DataItem::new(vec![0; 10]));
 
         let mut ordered_elements = client.order_elements_for_writing(
-            &[path_values.as_slice(), &[new_item]].concat(),
+            &mut [path_values.as_slice(), &[new_item]].concat(),
             path,
             path_oram.tree().height() as usize,
         );
@@ -291,7 +291,7 @@ mod tests {
         client.stash.push(DataItem::new(vec![0; 10]));
 
         let mut ordered_elements = client.order_elements_for_writing(
-            &path_values,
+            &mut path_values,
             path,
             path_oram.tree().height() as usize,
         );
@@ -379,7 +379,7 @@ mod tests {
         client.stash.push(DataItem::new(vec![0; 10]));
 
         let mut ordered_elements = client.order_elements_for_writing(
-            &[path_values.as_slice(), new_values.as_slice()].concat(),
+            &mut [path_values.as_slice(), new_values.as_slice()].concat(),
             path,
             path_oram.tree().height() as usize,
         );
@@ -458,7 +458,7 @@ mod tests {
         }
 
         let mut ordered_elements = client.order_elements_for_writing(
-            &[path_values.as_slice(), new_values.as_slice()].concat(),
+            &mut [path_values.as_slice(), new_values.as_slice()].concat(),
             path,
             path_oram.tree().height() as usize,
         );
@@ -695,6 +695,7 @@ mod tests {
 
         client.stash =
             [DataItem::new(elt1.clone()), DataItem::new(elt2.clone())].to_vec();
+
         let path_values_decrypted = vec![
             DataItem::new(elt3.clone()),
             DataItem::new(elt4.clone()),
@@ -710,7 +711,8 @@ mod tests {
         let path = 3;
         let tree_height = 4;
         let ordered_buckets = client.order_elements_for_writing(
-            &path_values_decrypted,
+            &mut [client.stash.as_slice(), path_values_decrypted.as_slice()]
+                .concat(),
             path,
             tree_height,
         );
@@ -901,7 +903,7 @@ mod tests {
          * at random.
          */
         let mut ordered_elements = client.order_elements_for_writing(
-            &[new_values.as_slice(), read_data.as_slice()].concat(),
+            &mut [new_values.as_slice(), read_data.as_slice()].concat(),
             path,
             path_oram.tree().height() as usize,
         );
