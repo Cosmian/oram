@@ -31,45 +31,7 @@ fn main() -> Result<(), Error> {
      */
     let mut client = ClientOram::new(nb_items);
 
-    let mut dummies = client
-        .generate_dummy_items(nb_items, ct_size)
-        .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
-
-    /*
-     * Server.
-     */
-    let mut path_oram = Oram::new(&mut dummies, nb_items)?;
-
-    // Let's read path number 22.
-    let path = 22;
-
-    let path_values_option =
-        path_oram.access(AccessType::Read, path, Option::None)?;
-
-    assert!(path_values_option.is_some());
-    // This is the data we read from the ORAM, only dummies at this point.
-    let mut read_data = path_values_option.unwrap();
-
-    /*
-     * We received server response. Moving client side...
-     */
-
-    // Decrypt them nonetheless.
-    client
-        .decrypt_items(&mut read_data)
-        .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
-
-    // Decrypt client stash.
-    client
-        .decrypt_stash()
-        .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
-
-    // Now read_data contains plaintext values. Decrypted dummy is null.
-    assert!(!read_data[9].data().is_empty());
-    let null_vector: Vec<u8> = vec![0; ct_size];
-    assert_eq!(read_data[9].data(), &null_vector);
-
-    // Let's add some real data to our position map now.
+    // Let's insert elements to position map.
     let mut csprng = CsRng::from_entropy();
     let mut new_values = Vec::with_capacity(50);
 
@@ -78,54 +40,33 @@ fn main() -> Result<(), Error> {
         csprng.fill_bytes(&mut rand_value);
         let data_item = DataItem::new(rand_value.clone());
 
-        client.position_map.insert(rand_value.clone(), 0);
-
-        let res_chg = client.change_element_position(&data_item);
-        assert!(res_chg.is_ok());
+        client.insert_element_in_position_map(&data_item);
 
         new_values.push(data_item);
     }
 
-    // Stash and elements read from path are combined and ordered.
-    let mut ordered_elements = client.order_elements_for_writing(
-        &[new_values.as_slice(), read_data.as_slice()].concat(),
-        path,
-        path_oram.tree().height() as usize,
-    );
+    let mut oram = client.setup_oram(ct_size)?;
 
-    /* We ordered elements and put the ones that could not be written in the
-     * stash. Since we want to write 26 elements and a path can only contain
-     * tree.height * BUCKET_SIZE = 6 * 4 (here) = 24 elements, the stash has
-     * to be not empty. However, its size can vary since we assigned paths
-     * at random.
-     */
-    assert!(!client.stash.is_empty());
+    let path = 22;
+    let mut read_data = client.read_from_path(&mut oram, path)?;
 
-    assert_eq!(ordered_elements.len(), path_oram.tree().height() as usize);
-    assert_eq!(ordered_elements[0].len(), BUCKET_SIZE);
+    /* Changing an element in the values obtained */
+    /* -------------------------------------------*/
+    let idx_data_item_to_change = 6;
 
-    // Encrypt read items to write them back to the ORAM.
+    // First remove old element from position map.
     client
-        .encrypt_items(&mut ordered_elements)
-        .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
+        .delete_element_from_position_map(&read_data[idx_data_item_to_change]);
 
-    // Encrypt back the stash.
-    client
-        .encrypt_stash()
-        .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
+    let data_changed = read_data[idx_data_item_to_change].data_as_mut();
+    data_changed[0] = 255;
 
-    /*
-     * Sending data to the server for writing...
-     * Each Read operation **must** be followed by a write operation on the same
-     * path. Client sends new DataItems to write to the tree alongside with his
-     * current stash (this is done during order_element_for_writing()).
-     */
-    let opt_write = path_oram.access(
-        AccessType::Write,
-        path,
-        Some(&mut ordered_elements),
-    )?;
-    assert!(opt_write.is_none());
+    // Insert changed element.
+    client.insert_element_in_position_map(&read_data[idx_data_item_to_change]);
+    /* -------------------------------------------*/
+
+    // I don't wish to insert new elements there.
+    client.write_to_path(&mut oram, &mut read_data, Option::None, path)?;
 
     Ok(())
 }

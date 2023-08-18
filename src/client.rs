@@ -1,4 +1,7 @@
-use crate::{btree::DataItem, oram::BUCKET_SIZE};
+use crate::{
+    btree::DataItem,
+    oram::{AccessType, Oram, BUCKET_SIZE},
+};
 use cosmian_crypto_core::{
     reexport::rand_core::SeedableRng, Aes256Gcm, CryptoCoreError, CsRng, Dem,
     FixedSizeCBytes, Instantiable, Nonce, RandomFixedSizeCBytes, SymmetricKey,
@@ -66,20 +69,21 @@ impl ClientOram {
         Ok(dummy_items)
     }
 
-    /// Orders elements stack wise. Elements to be placed first will be last in
-    /// the vector.
+    /// Orders `elts` into `tree.height` buckets of size `BUCKET_SIZE` in a
+    /// stackwise position. This is later given to the server on a write op.
+    /// For each level of the tree, computes a bucket of DataItem from `elts`
+    /// matching the given path. If less than `BUCKET_SIZE` elements match, fill
+    /// the bucket with dummy items (null vector).
     pub fn order_elements_for_writing(
         &mut self,
-        elts: &Vec<DataItem>,
+        elts: &mut Vec<DataItem>,
         path: usize,
         tree_height: usize,
     ) -> Vec<[DataItem; BUCKET_SIZE]> {
         let mut ordered_elements: Vec<[DataItem; BUCKET_SIZE]> =
             Vec::with_capacity(tree_height);
 
-        let size = elts[0].data().len();
-
-        let mut elements = [self.stash.as_slice(), elts.as_slice()].concat();
+        let elt_size = elts[0].data().len();
 
         for level in 0..tree_height {
             let mut bucket = [
@@ -90,12 +94,12 @@ impl ClientOram {
             ];
 
             for i in 0..BUCKET_SIZE {
-                for (j, data_item) in elements.iter().enumerate() {
+                for (j, data_item) in elts.iter().enumerate() {
                     if let Some(&data_item_path) =
                         self.position_map.get(data_item.data())
                     {
                         if data_item_path >> level == path >> level {
-                            bucket[i] = elements.remove(j);
+                            bucket[i] = elts.remove(j);
                             break;
                         }
                     }
@@ -104,7 +108,7 @@ impl ClientOram {
 
             bucket.iter_mut().for_each(|data_item| {
                 if data_item.data().is_empty() {
-                    data_item.set_data(vec![0; size]);
+                    data_item.set_data(vec![0; elt_size]);
                 }
             });
 
@@ -117,11 +121,12 @@ impl ClientOram {
          * stash.
          */
 
-        self.stash = elements
-            .into_iter()
+        self.stash = elts
+            .iter()
             .filter(|data_item| {
                 self.position_map.contains_key(data_item.data())
             })
+            .cloned()
             .collect();
 
         /*
@@ -154,6 +159,18 @@ impl ClientOram {
         *position = self.csprng.gen_range(0..max_path);
 
         Ok(())
+    }
+
+    /// Inserting an element provides him with a uniformly random generated path
+    pub fn insert_element_in_position_map(&mut self, elt: &DataItem) {
+        let max_path = 1 << (self.nb_items / BUCKET_SIZE).ilog2();
+
+        self.position_map
+            .insert(elt.data().clone(), self.csprng.gen_range(0..max_path));
+    }
+
+    pub fn delete_element_from_position_map(&mut self, elt: &DataItem) {
+        self.position_map.remove(elt.data());
     }
 
     pub fn encrypt_items(
@@ -233,6 +250,105 @@ impl ClientOram {
 
             stash_item.set_data(plaintext);
         }
+
+        Ok(())
+    }
+
+    pub fn setup_oram(&mut self, ct_size: usize) -> Result<Oram, Error> {
+        // Computes the number of slots in the complete tree.
+        let slots_complete_tree =
+            ((1 << (self.nb_items.ilog2() + 1)) - 1) * BUCKET_SIZE;
+
+        let mut dummy_items = self
+            .generate_dummy_items(slots_complete_tree, ct_size)
+            .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
+
+        // Creating a new oram with potential prepended data.
+        let oram = Oram::new(&mut dummy_items, self.nb_items)?;
+
+        Ok(oram)
+    }
+
+    pub fn read_from_path(
+        &mut self,
+        oram: &mut Oram,
+        path: usize,
+    ) -> Result<Vec<DataItem>, Error> {
+        if path > (1 << (oram.tree().height() - 1)) - 1 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!(
+                    "Invalid path access. Got {}, expected in range 0..{}",
+                    path,
+                    (1 << (oram.tree().height() - 1)) - 1
+                ),
+            ));
+        }
+
+        // Read values from path located in ORAM.
+        let mut read_data = oram
+            .access(AccessType::Read, path, Option::None)?
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::Interrupted,
+                    format!("No value returned from read at path {}", path),
+                )
+            })?;
+
+        // Decrypt items read and client stash.
+        self.decrypt_items(&mut read_data)
+            .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
+        self.decrypt_stash()
+            .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
+
+        // Return decrypted data from path concatenated to stash.
+        Ok([self.stash.as_slice(), read_data.as_slice()].concat())
+    }
+
+    pub fn write_to_path(
+        &mut self,
+        oram: &mut Oram,
+        write_elts: &mut Vec<DataItem>,
+        insert_new_elts: Option<Vec<DataItem>>,
+        path: usize,
+    ) -> Result<(), Error> {
+        if path > (1 << (oram.tree().height() - 1)) - 1 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!(
+                    "Invalid path access. Got {}, expected in range 0..{}",
+                    path,
+                    (1 << (oram.tree().height() - 1)) - 1
+                ),
+            ));
+        }
+
+        // Insert new elements to position map if specified.
+        if let Some(insert_new_elts) = insert_new_elts {
+            for data_item in insert_new_elts {
+                self.position_map.insert(data_item.data().clone(), 0);
+                self.change_element_position(&data_item)?;
+            }
+        }
+
+        /* Stash and elements read from path are ordered in buckets.
+         * Update stash with extra elements that could not be written.
+         */
+        let mut ordered_elements = self.order_elements_for_writing(
+            write_elts,
+            path,
+            oram.tree().height() as usize,
+        );
+
+        // Encrypt read items to write them back to the ORAM.
+        self.encrypt_items(&mut ordered_elements)
+            .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
+
+        // Encrypt back the stash.
+        self.encrypt_stash()
+            .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
+
+        oram.access(AccessType::Write, path, Some(&mut ordered_elements))?;
 
         Ok(())
     }
