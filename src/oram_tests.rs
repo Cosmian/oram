@@ -816,7 +816,7 @@ mod tests {
     fn general_behavior() {
         /*
          * Example of use for 183 items stored and a ciphertext size of 16 bytes.
-         * This means that there will be floor(183/4) = 46 nodes to hold those
+         * This means that there will be ceil(183/4) = 46 nodes to hold those
          * items which completes to 63 nodes for the tree. There will then be 32
          * leaves.
          */
@@ -869,9 +869,11 @@ mod tests {
 
         // Let's add some real data to our position map now.
         let mut csprng = CsRng::from_entropy();
-        let mut new_values = Vec::with_capacity(50);
+        let mut new_values = Vec::with_capacity(
+            path_oram.tree().height() as usize * BUCKET_SIZE + 2,
+        );
 
-        for _ in 0..26 {
+        for _ in 0..(path_oram.tree().height() as usize * BUCKET_SIZE) + 2 {
             let mut rand_value = vec![0; ct_size];
             csprng.fill_bytes(&mut rand_value);
             let data_item = DataItem::new(rand_value.clone());
@@ -883,12 +885,14 @@ mod tests {
 
             new_values.push(data_item);
         }
+        // Push a witness value for later.
+        let witness: Vec<u8> = [
+            10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+        ]
+        .to_vec();
+        client.position_map.insert(witness.clone(), path);
 
-        let mut ordered_elements = client.order_elements_for_writing(
-            &[new_values.as_slice(), read_data.as_slice()].concat(),
-            path,
-            path_oram.tree().height() as usize,
-        );
+        new_values.push(DataItem::new(witness.clone()));
 
         /* We ordered elements and put the ones that could not be written in the
          * stash. Since we want to write 26 elements and a path can only contain
@@ -896,6 +900,12 @@ mod tests {
          * to be not empty. However, its size can vary since we assigned paths
          * at random.
          */
+        let mut ordered_elements = client.order_elements_for_writing(
+            &[new_values.as_slice(), read_data.as_slice()].concat(),
+            path,
+            path_oram.tree().height() as usize,
+        );
+
         assert!(!client.stash.is_empty());
 
         assert_eq!(ordered_elements.len(), path_oram.tree().height() as usize);
@@ -923,5 +933,23 @@ mod tests {
         assert!(res_write.is_ok());
         let opt_write = res_write.unwrap();
         assert!(opt_write.is_none());
+
+        /*
+         * Let's read the same path again to check if values read are the same.
+         */
+        let res_read = path_oram.access(AccessType::Read, path, Option::None);
+        assert!(res_read.is_ok());
+        let opt_read = res_read.unwrap();
+        assert!(opt_read.is_some());
+
+        let mut read_values = opt_read.unwrap();
+
+        let dec_res = client.decrypt_items(&mut read_values);
+        assert!(dec_res.is_ok());
+
+        // Check that the path we read from contains the witness we inserted.
+        read_values
+            .iter()
+            .any(|data_item| data_item.data() == &witness);
     }
 }

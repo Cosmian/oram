@@ -69,13 +69,6 @@ fn main() -> Result<(), Error> {
     let null_vector: Vec<u8> = vec![0; ct_size];
     assert_eq!(read_data[9].data(), &null_vector);
 
-    // Stash and elements read from path are combined and ordered.
-    let mut ordered_elements = client.order_elements_for_writing(
-        &read_data,
-        path,
-        path_oram.tree().height() as usize,
-    );
-
     // Let's add some real data to our position map now.
     let mut csprng = CsRng::from_entropy();
     let mut new_values = Vec::with_capacity(50);
@@ -93,6 +86,7 @@ fn main() -> Result<(), Error> {
         new_values.push(data_item);
     }
 
+    // Stash and elements read from path are combined and ordered.
     let mut ordered_elements = client.order_elements_for_writing(
         &[new_values.as_slice(), read_data.as_slice()].concat(),
         path,
