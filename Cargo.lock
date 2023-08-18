@@ -3,10 +3,6 @@
 version = 3
 
 [[package]]
-<<<<<<< HEAD
-name = "path_oram"
-version = "0.1.0"
-=======
 name = "aead"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -380,4 +376,3 @@ dependencies = [
  "quote",
  "syn",
 ]
->>>>>>> 1fae9af ([gitignore] Added rust format setting files to gitignore)
