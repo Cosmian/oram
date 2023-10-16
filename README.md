@@ -31,7 +31,7 @@ An item is always stored **somewhere** on the path from the root to its leaf. Fo
 ![Alt text](./div/path-example.png)
 
 #### Accessing an item
-Read the path from root to leaf. Visit each node in the path and return each elements in the bucket of the node. Client now decrypts and optionnaly changed accessed items regarding his needs. Upon writing back the items, the client encrypts them again (using a different key) and assigns a new position to affected items. When writing elements back to the tree, the path to write elements at is the same as for reading but elements are greedily filled from bottom to up (right side visit of the tree) and they have to be assigned to a node belonging to their path. This means that elements will only be written at a node which intersects the read-path and the new assigned-path.
+Read the path from root to leaf. Visit each node in the path and return each elements in the bucket of the node. Client now decrypts and optionnaly changed accessed items regarding his needs. Upon writing back the items, the client encrypts them again (using a different nonce) and assigns a new position to affected items (drawn at random following a uniform distribution among the leaves). When writing elements back to the tree, the path to write elements at is the same as for reading but elements are greedily filled from bottom to up (right side visit of the tree) and they have to be assigned to a node belonging to their path. This means that changed elements will only be written at a node which intersects the read-path and the new assigned-path.
 
 There is a possibility, after each R/W operation that all elements could not be written back to the tree. This is why the client stores a stash (client-side for now). It is said that Path-ORAM fails only when the stash size is greater than $O(logn)$ and this happens with probability lesser than $14 \times 0.6002^{-R}$.
 
@@ -40,7 +40,7 @@ Path-ORAM achieves $O(logn)$ overhead complexity and $O(logn)$ client storage **
 ### Recursive ORAM
 One could reduce overhead by introducing recursive ORAM. Instead of performing plain search on nodes buckets, perform ORAM search on them. Each layer of recursion then diminishes overhead complexity by a factor of logarithmic order.
 
-### Build test, and run
+### Build, test, and run
 To build this program, `cargo 1.67.1` is needed.
 
 Simply run `cargo build` followed by `cargo run`.
