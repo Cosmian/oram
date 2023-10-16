@@ -5,7 +5,7 @@ pub const BUCKET_SIZE: usize = 4;
 
 pub enum AccessType {
     Read,
-    Write,
+    Write(Vec<[DataItem; BUCKET_SIZE]>),
 }
 
 pub struct Oram {
@@ -13,10 +13,7 @@ pub struct Oram {
 }
 
 impl Oram {
-    pub fn new(
-        data_items: &mut Vec<DataItem>,
-        nb_items: usize,
-    ) -> Result<Oram, Error> {
+    pub fn new(mut data_items: Vec<DataItem>, nb_items: usize) -> Result<Oram, Error> {
         if nb_items == 0 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -25,16 +22,11 @@ impl Oram {
         }
 
         Ok(Oram {
-            tree: BTree::init_new(data_items, nb_items),
+            tree: BTree::init_new(&mut data_items, nb_items),
         })
     }
 
-    pub fn access(
-        &mut self,
-        op: AccessType,
-        path: usize,
-        data: Option<&mut Vec<[DataItem; BUCKET_SIZE]>>,
-    ) -> Result<Option<Vec<DataItem>>, Error> {
+    pub fn access(&mut self, op: AccessType, path: usize) -> Result<Option<Vec<DataItem>>, Error> {
         if path > (1 << (self.tree.height() - 1)) - 1 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -48,135 +40,66 @@ impl Oram {
 
         match op {
             AccessType::Read => {
-                let mut path_items = Vec::new();
-
-                Oram::read_path(
-                    self.tree.root.as_ref(),
-                    &mut path_items,
-                    path,
-                    self.tree.height(),
-                    0,
-                );
-
-                // Returning values from tree visit.
-                Ok(Some(path_items))
+                Ok(self.tree.root.as_ref().map(|root| {
+                    // TODO (TBZ): Allocate the correct amount of memory or return it as a result
+                    // from `read_path`.
+                    let mut path_items = Vec::new();
+                    Oram::read_path(root, &mut path_items, path, self.tree.height(), 0);
+                    path_items
+                }))
             }
-            AccessType::Write => {
-                if let Some(data) = data {
-                    let tree_height = self.tree.height();
-                    Oram::write_path(
-                        self.tree.root.as_mut(),
-                        data,
-                        path,
-                        tree_height,
-                        0,
-                    );
-
-                    return Ok(None);
+            AccessType::Write(mut data) => {
+                let height = self.tree.height();
+                if let Some(root) = self.tree.root.as_mut() {
+                    Oram::write(root, &mut data, path, height, 0);
                 }
-
-                Err(Error::new(
-                    ErrorKind::InvalidInput,
-                    "Invalid data to write. Got None, expected Some"
-                        .to_string(),
-                ))
+                Ok(None)
             }
         }
     }
 
-    fn read_path(
-        node: Option<&Box<Node>>,
-        path_data: &mut Vec<DataItem>,
-        path: usize,
-        height: u16,
-        level: u16,
-    ) {
-        // Check if not out of the binary tree.
-        if let Some(node) = node {
-            // Push elements in the node in the vector.
-            node.bucket().iter().for_each(|data_item| {
-                path_data.push(data_item.clone());
-            });
+    /// Determine if the next node to select is the left one.
+    fn get_is_next_left(path: usize, level: u16, height: u16) -> bool {
+        // Notice that:
+        // - `height - 1` is used since `level < height`;
+        // - `level + 1` is used since the information concerns the next level.
+        let shift = ((height - 1) as i16 - (level + 1) as i16).max(0);
+        (path >> shift) % 2 == 0
+    }
 
-            /*
-             * Left-to-right bitwise analysis. Substraction of 2 because one is
-             * for height being one more than path bit length. The other one is
-             * because we want to see the bit corresponding to the next level.
-             * Below condition checks overflow.
-             */
-            let mut bit_shift = (height - level) as i16 - 2;
-            if bit_shift < 0 {
-                bit_shift = 0;
-            }
+    fn read_path(node: &Node, data: &mut Vec<DataItem>, path: usize, height: u16, level: u16) {
+        data.extend(node.slots().cloned());
 
-            if (path >> bit_shift) % 2 == 0 {
-                Oram::read_path(
-                    node.left.as_ref(),
-                    path_data,
-                    path,
-                    height,
-                    level + 1,
-                );
-            } else {
-                Oram::read_path(
-                    node.right.as_ref(),
-                    path_data,
-                    path,
-                    height,
-                    level + 1,
-                );
-            }
+        let next_node = if Self::get_is_next_left(path, level, height) {
+            node.left.as_ref()
+        } else {
+            node.right.as_ref()
+        };
+
+        if let Some(node) = next_node {
+            Oram::read_path(node, data, path, height, level + 1);
         }
     }
 
-    fn write_path(
-        node: Option<&mut Box<Node>>,
-        path_data: &mut Vec<[DataItem; BUCKET_SIZE]>,
+    fn write(
+        node: &mut Box<Node>,
+        data: &mut Vec<[DataItem; BUCKET_SIZE]>,
         path: usize,
         height: u16,
         level: u16,
     ) {
-        // Check if not out of the binary tree.
-        if let Some(node) = node {
-            // Left-to-right bitwise analysis.
+        let next_node = if Self::get_is_next_left(path, level, height) {
+            node.left.as_mut()
+        } else {
+            node.right.as_mut()
+        };
 
-            /*
-             * Left-to-right bitwise analysis. Substraction of 2 because one is
-             * for height being one more than path bit length. The other one is
-             * because we want to see the bit corresponding to the next level.
-             * Below condition checks overflow.
-             */
-            let mut bit_shift = (height - level) as i16 - 2;
-            if bit_shift < 0 {
-                bit_shift = 0;
-            }
+        if let Some(node) = next_node {
+            Oram::write(node, data, path, height, level + 1);
+        }
 
-            if (path >> bit_shift) % 2 == 0 {
-                Oram::write_path(
-                    node.left.as_mut(),
-                    path_data,
-                    path,
-                    height,
-                    level + 1,
-                );
-            } else {
-                Oram::write_path(
-                    node.right.as_mut(),
-                    path_data,
-                    path,
-                    height,
-                    level + 1,
-                );
-            }
-
-            /*
-             * Write element to the path. Right-side view method to greedily
-             * fill the buckets. Elements can only be written on the path if
-             * their new path is at an intersection with the old path.
-             */
-            if let Some(bucket) = path_data.pop() {
-                node.set_bucket(bucket);
-            }
+        if let Some(new_bucket) = data.pop() {
+            node.set_bucket(new_bucket);
         }
     }
 

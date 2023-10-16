@@ -1,7 +1,8 @@
 mod btree;
 mod client;
 mod oram;
-mod oram_tests;
+#[cfg(test)]
+mod tests;
 
 use crate::{
     btree::DataItem,
@@ -31,24 +32,20 @@ fn main() -> Result<(), Error> {
      */
     let mut client = ClientOram::new(nb_items);
 
-    let mut dummies = client
+    let dummy_items = client
         .generate_dummy_items(nb_items, ct_size)
         .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
 
     /*
      * Server.
      */
-    let mut path_oram = Oram::new(&mut dummies, nb_items)?;
+    let mut path_oram = Oram::new(dummy_items, nb_items)?;
 
     // Let's read path number 22.
     let path = 22;
 
-    let path_values_option =
-        path_oram.access(AccessType::Read, path, Option::None)?;
-
-    assert!(path_values_option.is_some());
-    // This is the data we read from the ORAM, only dummies at this point.
-    let mut read_data = path_values_option.unwrap();
+    // TODO (TBZ): `path_data` should not need mutability.
+    let mut path_data = path_oram.access(AccessType::Read, path)?.unwrap();
 
     /*
      * We received server response. Moving client side...
@@ -56,18 +53,10 @@ fn main() -> Result<(), Error> {
 
     // Decrypt them nonetheless.
     client
-        .decrypt_items(&mut read_data)
+        .decrypt_items(&mut path_data)
         .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
 
-    // Decrypt client stash.
-    client
-        .decrypt_stash()
-        .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
-
-    // Now read_data contains plaintext values. Decrypted dummy is null.
-    assert!(!read_data[9].data().is_empty());
-    let null_vector: Vec<u8> = vec![0; ct_size];
-    assert_eq!(read_data[9].data(), &null_vector);
+    assert_eq!(path_data[9].data(), &vec![0; ct_size]);
 
     // Let's add some real data to our position map now.
     let mut csprng = CsRng::from_entropy();
@@ -88,7 +77,7 @@ fn main() -> Result<(), Error> {
 
     // Stash and elements read from path are combined and ordered.
     let mut ordered_elements = client.order_elements_for_writing(
-        &[new_values.as_slice(), read_data.as_slice()].concat(),
+        &[new_values.as_slice(), path_data.as_slice()].concat(),
         path,
         path_oram.tree().height() as usize,
     );
@@ -109,22 +98,13 @@ fn main() -> Result<(), Error> {
         .encrypt_items(&mut ordered_elements)
         .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
 
-    // Encrypt back the stash.
-    client
-        .encrypt_stash()
-        .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
-
     /*
      * Sending data to the server for writing...
      * Each Read operation **must** be followed by a write operation on the same
      * path. Client sends new DataItems to write to the tree alongside with his
      * current stash (this is done during order_element_for_writing()).
      */
-    let opt_write = path_oram.access(
-        AccessType::Write,
-        path,
-        Some(&mut ordered_elements),
-    )?;
+    let opt_write = path_oram.access(AccessType::Write(ordered_elements), path)?;
     assert!(opt_write.is_none());
 
     Ok(())

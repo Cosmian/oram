@@ -1,4 +1,5 @@
 use crate::oram::BUCKET_SIZE;
+use std::slice::Iter;
 
 #[derive(Debug, Clone, Default)]
 pub struct BTree {
@@ -12,43 +13,21 @@ impl BTree {
             root: Option::None,
             height: (nb_items / BUCKET_SIZE).ilog2() as u16 + 1,
         };
-
-        let mut root = Node::new();
-
-        tree.complete_tree(&mut root, data_items, 0);
-        tree.root = Some(Box::new(root));
-
+        tree.root = tree.complete_tree(data_items, 0);
         tree
     }
 
-    fn complete_tree(
-        &self,
-        node: &mut Node,
-        data_items: &mut Vec<DataItem>,
-        level: u16,
-    ) {
-        // -1 is to avoid constructing 1 extra level.
-        if level < self.height - 1 {
-            let mut left: Box<Node> = Box::new(Node::new());
-            let mut right = Box::new(Node::new());
-
-            self.complete_tree(&mut left, data_items, level + 1);
-            self.complete_tree(&mut right, data_items, level + 1);
-
-            node.left = Some(left);
-            node.right = Some(right);
+    fn complete_tree(&self, data_items: &mut Vec<DataItem>, level: u16) -> Option<Box<Node>> {
+        if level == self.height {
+            return None;
         }
 
-        /*
-         * Greedily filling buckets following a right side visit to fill leaves
-         * first.
-         */
-        for i in 0..BUCKET_SIZE {
-            // data_items must be a stack of items.
-            if let Some(data_item) = data_items.pop() {
-                node.set_bucket_element(data_item, i);
-            }
-        }
+        let mut node = Node::new();
+        node.fill_slots(data_items);
+        node.left = self.complete_tree(data_items, level + 1);
+        node.right = self.complete_tree(data_items, level + 1);
+
+        Some(Box::new(node))
     }
 
     pub fn height(&self) -> u16 {
@@ -77,16 +56,22 @@ impl Node {
         }
     }
 
-    pub fn bucket(&self) -> &[DataItem; BUCKET_SIZE] {
-        &self.bucket
+    pub fn slots(&self) -> Iter<DataItem> {
+        self.bucket.iter()
     }
 
-    pub fn set_bucket(&mut self, bucket: [DataItem; BUCKET_SIZE]) {
-        self.bucket = bucket;
+    pub fn fill_slots(&mut self, data: &mut Vec<DataItem>) {
+        for slot in &mut self.bucket {
+            if let Some(data_item) = data.pop() {
+                *slot = data_item
+            } else {
+                break;
+            }
+        }
     }
 
-    pub fn set_bucket_element(&mut self, elt: DataItem, i: usize) {
-        self.bucket[i] = elt;
+    pub fn set_bucket(&mut self, bucket_value: [DataItem; BUCKET_SIZE]) {
+        self.bucket = bucket_value;
     }
 }
 
