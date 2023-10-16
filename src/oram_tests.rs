@@ -822,7 +822,7 @@ mod tests {
          * items which completes to 63 nodes for the tree. There will then be 32
          * leaves.
          */
-        let nb_items: usize = 182;
+        let nb_items: usize = 183;
         let ct_size: usize = 16;
 
         /*
