@@ -1,5 +1,10 @@
 use crate::oram::BUCKET_SIZE;
 
+/// XXX - ceiling method for division but usize may overflow.
+pub fn udiv_ceil(a: usize, b: usize) -> usize {
+    (a + b - 1) / b
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct BTree {
     pub(super) root: Option<Box<Node>>,
@@ -10,7 +15,7 @@ impl BTree {
     pub fn init_new(data_items: &mut Vec<DataItem>, nb_items: usize) -> BTree {
         let mut tree = BTree {
             root: Option::None,
-            height: (nb_items / BUCKET_SIZE).ilog2() as u16 + 1,
+            height: udiv_ceil(nb_items, BUCKET_SIZE).ilog2() as u16 + 1,
         };
 
         let mut root = Node::new();
