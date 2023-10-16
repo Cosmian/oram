@@ -1,5 +1,5 @@
 use crate::{
-    btree::DataItem,
+    btree::{udiv_ceil, DataItem},
     oram::{AccessType, Oram, BUCKET_SIZE},
 };
 use cosmian_crypto_core::{
@@ -148,7 +148,7 @@ impl ClientOram {
          * Number of leaves (max_path) is the previous power of two of the
          * number of elements.
          */
-        let max_path = 1 << (self.nb_items / BUCKET_SIZE).ilog2();
+        let max_path = 1 << udiv_ceil(self.nb_items, BUCKET_SIZE).ilog2();
 
         let position =
             self.position_map.get_mut(elt.data()).ok_or(Error::new(
@@ -163,7 +163,7 @@ impl ClientOram {
 
     /// Inserting an element provides him with a uniformly random generated path
     pub fn insert_element_in_position_map(&mut self, elt: &DataItem) {
-        let max_path = 1 << (self.nb_items / BUCKET_SIZE).ilog2();
+        let max_path = 1 << udiv_ceil(self.nb_items, BUCKET_SIZE).ilog2();
 
         self.position_map
             .insert(elt.data().clone(), self.csprng.gen_range(0..max_path));
@@ -256,8 +256,12 @@ impl ClientOram {
 
     pub fn setup_oram(&mut self, ct_size: usize) -> Result<Oram, Error> {
         // Computes the number of slots in the complete tree.
+        // We need ceil(nb_items / BUCKET_SIZE) buckets to store our elements.
+        // the next power of two minus one of this number is the size of the
+        // necessary complete tree.
         let slots_complete_tree =
-            ((1 << (self.nb_items.ilog2() + 1)) - 1) * BUCKET_SIZE;
+            ((1 << (udiv_ceil(self.nb_items, BUCKET_SIZE).ilog2() + 1)) - 1)
+                * BUCKET_SIZE;
 
         let mut dummy_items = self
             .generate_dummy_items(slots_complete_tree, ct_size)

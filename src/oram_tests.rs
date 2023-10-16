@@ -4,7 +4,7 @@ mod tests {
     use rand::RngCore;
 
     use crate::{
-        btree::{DataItem, Node},
+        btree::{udiv_ceil, DataItem, Node},
         client::ClientOram,
         oram::{AccessType, Oram, BUCKET_SIZE},
     };
@@ -63,6 +63,34 @@ mod tests {
     }
 
     #[test]
+    fn complete_tree_size_below_pow2() {
+        // This test is for when the items are not a multiple of BUCKET_SIZE
+        let nb_items: usize = 255 * BUCKET_SIZE + BUCKET_SIZE - 1;
+
+        let path_oram = Oram::new(&mut Vec::new(), nb_items);
+
+        if let Ok(path_oram) = path_oram {
+            let tree_size = _complete_tree_size(path_oram.tree().root.as_ref());
+            assert_eq!(tree_size, 511);
+            assert_eq!(path_oram.tree().height(), 9)
+        }
+    }
+
+    #[test]
+    fn complete_tree_size_below_pow2_bis() {
+        // This test is for when the items are not a multiple of BUCKET_SIZE
+        let nb_items: usize = 252 * BUCKET_SIZE + BUCKET_SIZE - 1;
+
+        let path_oram = Oram::new(&mut Vec::new(), nb_items);
+
+        if let Ok(path_oram) = path_oram {
+            let tree_size = _complete_tree_size(path_oram.tree().root.as_ref());
+            assert_eq!(tree_size, 255);
+            assert_eq!(path_oram.tree().height(), 8)
+        }
+    }
+
+    #[test]
     fn complete_tree_size_rand() {
         let nb_items: usize = 26 * BUCKET_SIZE;
 
@@ -72,6 +100,22 @@ mod tests {
             let tree_size = _complete_tree_size(path_oram.tree().root.as_ref());
             assert_eq!(tree_size, 31);
         }
+    }
+
+    #[test]
+    fn max_path() {
+        let nb_items = 183 * BUCKET_SIZE + 2;
+        let max_path = 1 << udiv_ceil(nb_items, BUCKET_SIZE).ilog2();
+
+        assert_eq!(max_path, 128);
+    }
+
+    #[test]
+    fn max_path_below_pow2() {
+        let nb_items = 255 * BUCKET_SIZE + 2;
+        let max_path = 1 << udiv_ceil(nb_items, BUCKET_SIZE).ilog2();
+
+        assert_eq!(max_path, 256);
     }
 
     #[test]
