@@ -1,8 +1,25 @@
 use crate::oram::BUCKET_SIZE;
 
-/// XXX - ceiling method for division but usize may overflow.
+/// Performs ceiling division on usize type.
 pub fn udiv_ceil(a: usize, b: usize) -> usize {
-    (a + b - 1) / b
+    (a as f32 / b as f32).ceil() as usize
+}
+
+/// The size of a complete tree is the next power of two minus one of the number
+/// of items stored.
+pub fn get_complete_tree_size(nb_items: usize, node_capacity: usize) -> usize {
+    let nb_nodes_necessary = udiv_ceil(nb_items, node_capacity);
+
+    // Getting next power of two strictly greater than `nb_nodes_necessary`.
+    (1 << (nb_nodes_necessary.ilog2() + 1)) - 1
+}
+
+/// There are two times less leaves than there are nodes + 1 in a complete tree.
+pub fn get_complete_tree_leaves(
+    nb_items: usize,
+    node_capacity: usize,
+) -> usize {
+    (get_complete_tree_size(nb_items, node_capacity) + 1) >> 1
 }
 
 #[derive(Debug, Clone, Default)]
