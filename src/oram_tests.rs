@@ -4,7 +4,9 @@ mod tests {
     use rand::RngCore;
 
     use crate::{
-        btree::{udiv_ceil, DataItem, Node},
+        btree::{
+            get_complete_tree_leaves, get_complete_tree_size, DataItem, Node,
+        },
         client::ClientOram,
         oram::{AccessType, Oram, BUCKET_SIZE},
     };
@@ -117,19 +119,84 @@ mod tests {
     }
 
     #[test]
-    fn max_path() {
-        let nb_items = 183 * BUCKET_SIZE + 2;
-        let max_path = 1 << udiv_ceil(nb_items, BUCKET_SIZE).ilog2();
+    fn complete_tree_size_from_items() {
+        let nb_items = 183;
 
-        assert_eq!(max_path, 128);
+        let size = get_complete_tree_size(nb_items, BUCKET_SIZE);
+
+        assert_eq!(size, 63);
     }
 
     #[test]
-    fn max_path_below_pow2() {
-        let nb_items = 255 * BUCKET_SIZE + 2;
-        let max_path = 1 << udiv_ceil(nb_items, BUCKET_SIZE).ilog2();
+    fn complete_tree_size_from_items_below_pow2() {
+        let nb_items = 255 * BUCKET_SIZE + 3;
 
-        assert_eq!(max_path, 256);
+        let size = get_complete_tree_size(nb_items, BUCKET_SIZE);
+
+        assert_eq!(size, 511);
+    }
+
+    #[test]
+    fn complete_tree_size_from_items_above_pow2() {
+        let nb_items = 256 * BUCKET_SIZE + 3;
+
+        let size = get_complete_tree_size(nb_items, BUCKET_SIZE);
+
+        assert_eq!(size, 511);
+    }
+
+    #[test]
+    fn complete_tree_size_from_items_pow2() {
+        let nb_items = 256 * BUCKET_SIZE;
+
+        let size = get_complete_tree_size(nb_items, BUCKET_SIZE);
+
+        assert_eq!(size, 511);
+    }
+
+    #[test]
+    fn complete_tree_leaves_from_items() {
+        let nb_items = 183;
+
+        let size = get_complete_tree_leaves(nb_items, BUCKET_SIZE);
+
+        assert_eq!(size, 32);
+    }
+
+    #[test]
+    fn complete_tree_leaves_from_items_below_pow2() {
+        let nb_items = 255 * BUCKET_SIZE + 3;
+
+        let size = get_complete_tree_leaves(nb_items, BUCKET_SIZE);
+
+        assert_eq!(size, 256);
+    }
+
+    #[test]
+    fn complete_tree_leaves_from_items_above_pow2() {
+        let nb_items = 256 * BUCKET_SIZE + 3;
+
+        let size = get_complete_tree_leaves(nb_items, BUCKET_SIZE);
+
+        assert_eq!(size, 256);
+    }
+
+    #[test]
+    fn complete_tree_leaves_from_items_pow2() {
+        let nb_items = 256 * BUCKET_SIZE;
+
+        let size = get_complete_tree_leaves(nb_items, BUCKET_SIZE);
+
+        assert_eq!(size, 256);
+    }
+
+    #[test]
+    fn complete_tree_leaves_rand() {
+        let nb_items = 13337;
+
+        let size = get_complete_tree_leaves(nb_items, BUCKET_SIZE);
+
+        assert_eq!(size, 2048);
     }
 
     #[test]
