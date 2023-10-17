@@ -95,6 +95,8 @@ impl ClientOram {
 
             for i in 0..BUCKET_SIZE {
                 for (j, data_item) in elts.iter().enumerate() {
+                    // Because dummies are not in the position map, they don't
+                    // match the condition.
                     if let Some(&data_item_path) =
                         self.position_map.get(data_item.data())
                     {
@@ -313,7 +315,7 @@ impl ClientOram {
         &mut self,
         oram: &mut Oram,
         write_elts: &mut Vec<DataItem>,
-        insert_new_elts: Option<Vec<DataItem>>,
+        insert_new_elts: Option<&mut Vec<DataItem>>,
         path: usize,
     ) -> Result<(), Error> {
         if path > (1 << (oram.tree().height() - 1)) - 1 {
@@ -329,10 +331,13 @@ impl ClientOram {
 
         // Insert new elements to position map if specified.
         if let Some(insert_new_elts) = insert_new_elts {
-            for data_item in insert_new_elts {
+            for data_item in insert_new_elts.iter() {
                 self.position_map.insert(data_item.data().clone(), 0);
-                self.change_element_position(&data_item)?;
+                self.change_element_position(data_item)?;
             }
+
+            // Add inserted elements to elements to write.
+            write_elts.append(insert_new_elts);
         }
 
         /* Stash and elements read from path are ordered in buckets.

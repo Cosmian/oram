@@ -63,6 +63,20 @@ mod tests {
     }
 
     #[test]
+    fn complete_tree_size_above_pow2() {
+        // This test is for when the items are not a multiple of BUCKET_SIZE
+        let nb_items: usize = 256 * BUCKET_SIZE + 1;
+
+        let path_oram = Oram::new(&mut Vec::new(), nb_items);
+
+        if let Ok(path_oram) = path_oram {
+            let tree_size = _complete_tree_size(path_oram.tree().root.as_ref());
+            assert_eq!(tree_size, 511);
+            assert_eq!(path_oram.tree().height(), 9)
+        }
+    }
+
+    #[test]
     fn complete_tree_size_below_pow2() {
         // This test is for when the items are not a multiple of BUCKET_SIZE
         let nb_items: usize = 255 * BUCKET_SIZE + BUCKET_SIZE - 1;
@@ -997,5 +1011,88 @@ mod tests {
         read_values
             .iter()
             .any(|data_item| data_item.data() == &witness);
+    }
+
+    #[test]
+    fn encryption_integrity() {
+        let nb_items: usize = 12;
+        let ct_size: usize = 32;
+
+        /*
+         * Client.
+         */
+        let mut client = ClientOram::new(nb_items);
+
+        // Arbitrary 12 insertions for the example.
+        let nb_insertions = 12;
+        let mut new_values = Vec::with_capacity(nb_insertions);
+
+        let di_insert =
+            DataItem::new(br#"Lattice-based signature schemes "#.to_vec());
+        new_values.push(di_insert);
+        let di_insert =
+            DataItem::new(br#"following the Goldreich-Goldwass"#.to_vec());
+        new_values.push(di_insert);
+        let di_insert =
+            DataItem::new(br#"er-Halevi (GGH) design have the "#.to_vec());
+        new_values.push(di_insert);
+        let di_insert =
+            DataItem::new(br#"unusual property that each signa"#.to_vec());
+        new_values.push(di_insert);
+        let di_insert =
+            DataItem::new(br#"ture leaks information on the si"#.to_vec());
+        new_values.push(di_insert);
+        let di_insert =
+            DataItem::new(br#"gner's secret key, but this does"#.to_vec());
+        new_values.push(di_insert);
+        let di_insert =
+            DataItem::new(br#"not necessarily imply that such "#.to_vec());
+        new_values.push(di_insert);
+        let di_insert =
+            DataItem::new(br#"schemes are insecure. At Eurocry"#.to_vec());
+        new_values.push(di_insert);
+        let di_insert =
+            DataItem::new(br#"pt '03, Szydlo proposed a potent"#.to_vec());
+        new_values.push(di_insert);
+        let di_insert =
+            DataItem::new(br#"ial attackby showing that the le"#.to_vec());
+        new_values.push(di_insert);
+        let di_insert =
+            DataItem::new(br#"akage reduces the key-recovery p"#.to_vec());
+        new_values.push(di_insert);
+        let di_insert =
+            DataItem::new(br#"roblem to that of distinguishing"#.to_vec());
+        new_values.push(di_insert);
+
+        let mut oram = client.setup_oram(ct_size).unwrap();
+
+        let path = 1;
+        let mut read_data = client.read_from_path(&mut oram, path).unwrap();
+
+        // Let's insert the new values upon writing. Since tree has height 2,
+        // all values won't be stored and some will be left in the stash.
+        client
+            .write_to_path(
+                &mut oram,
+                &mut read_data,
+                Some(&mut new_values),
+                path,
+            )
+            .unwrap();
+
+        assert!(client.stash.len() >= 4);
+
+        let mut read_data2 = client.read_from_path(&mut oram, path).unwrap();
+
+        // Checks decryption went well. Can fail with low probability if it has
+        // been assigned path 1 when inserting to posmap and if it has been
+        // sorted among the last to insert.
+        assert!(read_data2.contains(&DataItem::new(
+            br#"roblem to that of distinguishing"#.to_vec()
+        )));
+
+        client
+            .write_to_path(&mut oram, &mut read_data2, None, path)
+            .unwrap();
     }
 }

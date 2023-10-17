@@ -49,7 +49,12 @@ fn main() -> Result<(), Error> {
     let mut read_data = client.read_from_path(&mut oram, path)?;
 
     // Let's insert the new values upon writing.
-    client.write_to_path(&mut oram, &mut read_data, Some(new_values), path)?;
+    client.write_to_path(
+        &mut oram,
+        &mut read_data,
+        Some(&mut new_values),
+        path,
+    )?;
 
     /*
      * Let's make another read. Same path or different one, doesn't matter for
