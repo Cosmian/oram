@@ -5,7 +5,8 @@ mod tests {
 
     use crate::{
         btree::{
-            get_complete_tree_leaves, get_complete_tree_size, DataItem, Node,
+            get_complete_tree_leaves_number, get_complete_tree_size, DataItem,
+            Node,
         },
         client::ClientOram,
         oram::{AccessType, Oram, BUCKET_SIZE},
@@ -21,7 +22,7 @@ mod tests {
     }
 
     #[test]
-    fn complete_tree_size_zero() {
+    fn check_size_built_tree_zero() {
         let nb_items: usize = 0;
 
         let path_oram = Oram::new(&mut Vec::new(), nb_items);
@@ -29,7 +30,7 @@ mod tests {
     }
 
     #[test]
-    fn complete_tree_size_one() {
+    fn check_size_built_tree_one() {
         let nb_items: usize = BUCKET_SIZE;
 
         let path_oram = Oram::new(&mut Vec::new(), nb_items);
@@ -41,7 +42,7 @@ mod tests {
     }
 
     #[test]
-    fn complete_tree_size_pow_of_2() {
+    fn check_size_built_tree_pow_of_2() {
         let nb_items: usize = 32 * BUCKET_SIZE;
 
         let path_oram = Oram::new(&mut Vec::new(), nb_items);
@@ -53,7 +54,7 @@ mod tests {
     }
 
     #[test]
-    fn complete_tree_size_exact() {
+    fn check_size_built_tree_exact() {
         let nb_items: usize = 15 * BUCKET_SIZE;
 
         let path_oram = Oram::new(&mut Vec::new(), nb_items);
@@ -65,7 +66,7 @@ mod tests {
     }
 
     #[test]
-    fn complete_tree_size_above_pow2() {
+    fn check_size_built_tree_above_pow2() {
         // This test is for when the items are not a multiple of BUCKET_SIZE
         let nb_items: usize = 256 * BUCKET_SIZE + 1;
 
@@ -79,7 +80,7 @@ mod tests {
     }
 
     #[test]
-    fn complete_tree_size_below_pow2() {
+    fn check_size_built_tree_below_pow2() {
         // This test is for when the items are not a multiple of BUCKET_SIZE
         let nb_items: usize = 255 * BUCKET_SIZE + BUCKET_SIZE - 1;
 
@@ -93,7 +94,7 @@ mod tests {
     }
 
     #[test]
-    fn complete_tree_size_below_pow2_bis() {
+    fn check_size_built_tree_below_pow2_bis() {
         // This test is for when the items are not a multiple of BUCKET_SIZE
         let nb_items: usize = 252 * BUCKET_SIZE + BUCKET_SIZE - 1;
 
@@ -107,7 +108,7 @@ mod tests {
     }
 
     #[test]
-    fn complete_tree_size_rand() {
+    fn check_size_built_tree_rand() {
         let nb_items: usize = 26 * BUCKET_SIZE;
 
         let path_oram = Oram::new(&mut Vec::new(), nb_items);
@@ -158,7 +159,7 @@ mod tests {
     fn complete_tree_leaves_from_items() {
         let nb_items = 183;
 
-        let size = get_complete_tree_leaves(nb_items, BUCKET_SIZE);
+        let size = get_complete_tree_leaves_number(nb_items, BUCKET_SIZE);
 
         assert_eq!(size, 32);
     }
@@ -167,7 +168,7 @@ mod tests {
     fn complete_tree_leaves_from_items_below_pow2() {
         let nb_items = 255 * BUCKET_SIZE + 3;
 
-        let size = get_complete_tree_leaves(nb_items, BUCKET_SIZE);
+        let size = get_complete_tree_leaves_number(nb_items, BUCKET_SIZE);
 
         assert_eq!(size, 256);
     }
@@ -176,7 +177,7 @@ mod tests {
     fn complete_tree_leaves_from_items_above_pow2() {
         let nb_items = 256 * BUCKET_SIZE + 3;
 
-        let size = get_complete_tree_leaves(nb_items, BUCKET_SIZE);
+        let size = get_complete_tree_leaves_number(nb_items, BUCKET_SIZE);
 
         assert_eq!(size, 256);
     }
@@ -185,7 +186,7 @@ mod tests {
     fn complete_tree_leaves_from_items_pow2() {
         let nb_items = 256 * BUCKET_SIZE;
 
-        let size = get_complete_tree_leaves(nb_items, BUCKET_SIZE);
+        let size = get_complete_tree_leaves_number(nb_items, BUCKET_SIZE);
 
         assert_eq!(size, 256);
     }
@@ -194,7 +195,7 @@ mod tests {
     fn complete_tree_leaves_rand() {
         let nb_items = 13337;
 
-        let size = get_complete_tree_leaves(nb_items, BUCKET_SIZE);
+        let size = get_complete_tree_leaves_number(nb_items, BUCKET_SIZE);
 
         assert_eq!(size, 2048);
     }
@@ -1151,9 +1152,7 @@ mod tests {
 
         let mut read_data2 = client.read_from_path(&mut oram, path).unwrap();
 
-        // Checks decryption went well. Can fail with low probability if it has
-        // been assigned path 1 when inserting to posmap and if it has been
-        // sorted among the last to insert.
+        // Checks decryption went well.
         assert!(read_data2.contains(&DataItem::new(
             br#"roblem to that of distinguishing"#.to_vec()
         )));
