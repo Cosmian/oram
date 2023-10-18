@@ -15,7 +15,7 @@ pub fn get_complete_tree_size(nb_items: usize, node_capacity: usize) -> usize {
 }
 
 /// There are two times less leaves than there are nodes + 1 in a complete tree.
-pub fn get_complete_tree_leaves(
+pub fn get_complete_tree_leaves_number(
     nb_items: usize,
     node_capacity: usize,
 ) -> usize {
