@@ -12,25 +12,28 @@ use rand::Rng;
 use std::{
     collections::HashMap,
     io::{Error, ErrorKind},
+    ops::DerefMut,
+    sync::Mutex,
 };
 
 pub struct ClientOram {
     pub stash: Vec<DataItem>,
     pub position_map: HashMap<Vec<u8>, usize>,
     nb_items: usize,
-    csprng: CsRng,
+    csprng: Mutex<CsRng>,
     cipher: Aes256Gcm,
 }
 
 impl ClientOram {
     pub fn new(nb_items: usize) -> ClientOram {
-        let mut csprng = CsRng::from_entropy();
-        let key = SymmetricKey::new(&mut csprng);
+        let mut rng = CsRng::from_entropy();
+        let key = SymmetricKey::new(&mut rng);
 
-        let mut stash_capacity: usize = 0;
-        if nb_items != 0 {
-            stash_capacity = (nb_items.ilog2() + 1) as usize;
-        }
+        let stash_capacity = if nb_items == 0 {
+            0
+        } else {
+            (nb_items.ilog2() + 1) as usize
+        };
 
         ClientOram {
             /*
@@ -40,35 +43,30 @@ impl ClientOram {
             stash: Vec::with_capacity(stash_capacity),
             position_map: HashMap::with_capacity(nb_items),
             nb_items,
-            csprng,
+            csprng: Mutex::new(rng),
             cipher: Aes256Gcm::new(&key),
         }
     }
 
     pub fn generate_dummy_items(
-        &mut self,
+        &self,
         nb_dummy_items: usize,
         ct_size: usize,
     ) -> Result<Vec<DataItem>, CryptoCoreError> {
-        let mut dummy_items = Vec::with_capacity(nb_dummy_items);
-
-        for _ in 0..nb_dummy_items {
-            let dummy_data = vec![0; ct_size];
-
-            // Generate new nonce for encryption.
-            let nonce = Nonce::new(&mut self.csprng);
-
-            // Encrypt null vector as dummies.
-            let encrypted_data =
-                self.cipher.encrypt(&nonce, &dummy_data, None)?;
-
-            let encrypted_dummy =
-                [nonce.as_bytes(), encrypted_data.as_slice()].concat();
-
-            dummy_items.push(DataItem::new(encrypted_dummy));
-        }
-
-        Ok(dummy_items)
+        (0..nb_dummy_items)
+            .map(|_| {
+                let nonce = Nonce::new(
+                    self.csprng.lock().expect("lock poisonned").deref_mut(),
+                );
+                self.cipher.encrypt(&nonce, &vec![0; ct_size], None).map(
+                    |ciphertext| {
+                        DataItem::new(
+                            [nonce.as_bytes(), ciphertext.as_slice()].concat(),
+                        )
+                    },
+                )
+            })
+            .collect()
     }
 
     /// Orders `elts` into `tree.height` buckets of size `BUCKET_SIZE` in a
@@ -95,7 +93,7 @@ impl ClientOram {
                 DataItem::default(),
             ];
 
-            for i in 0..BUCKET_SIZE {
+            for slot in bucket.iter_mut() {
                 for (j, data_item) in elts.iter().enumerate() {
                     // Because dummies are not in the position map, they don't
                     // match the condition.
@@ -103,7 +101,7 @@ impl ClientOram {
                         self.position_map.get(data_item.data())
                     {
                         if data_item_path >> level == path >> level {
-                            bucket[i] = elts.remove(j);
+                            *slot = elts.remove(j);
                             break;
                         }
                     }
@@ -161,7 +159,8 @@ impl ClientOram {
                 format!("Error: element {:?} is not in the position map.", elt),
             ))?;
 
-        *position = self.csprng.gen_range(0..max_path);
+        let mut rng = self.csprng.lock().expect("lock poisonned");
+        *position = rng.gen_range(0..max_path);
 
         Ok(())
     }
@@ -171,8 +170,9 @@ impl ClientOram {
         let max_path =
             get_complete_tree_leaves_number(self.nb_items, BUCKET_SIZE);
 
+        let mut rng = self.csprng.lock().expect("lock poisonned");
         self.position_map
-            .insert(elt.data().clone(), self.csprng.gen_range(0..max_path));
+            .insert(elt.data().clone(), rng.gen_range(0..max_path));
     }
 
     pub fn delete_element_from_position_map(&mut self, elt: &DataItem) {
@@ -180,13 +180,15 @@ impl ClientOram {
     }
 
     pub fn encrypt_items(
-        &mut self,
+        &self,
         buckets: &mut Vec<[DataItem; BUCKET_SIZE]>,
     ) -> Result<(), CryptoCoreError> {
         for bucket in buckets {
             for item in bucket {
                 // Generate new nonce for encryption.
-                let nonce = Nonce::new(&mut self.csprng);
+                let nonce = Nonce::new(
+                    self.csprng.lock().expect("lock poisonned").deref_mut(),
+                );
 
                 let ciphertext =
                     self.cipher.encrypt(&nonce, item.data(), Option::None)?;
@@ -228,7 +230,9 @@ impl ClientOram {
 
     pub fn encrypt_stash(&mut self) -> Result<(), CryptoCoreError> {
         for stash_item in self.stash.iter_mut() {
-            let nonce = Nonce::new(&mut self.csprng);
+            let nonce = Nonce::new(
+                self.csprng.lock().expect("lock poisonned").deref_mut(),
+            );
 
             let ciphertext =
                 self.cipher
@@ -268,12 +272,12 @@ impl ClientOram {
         let slots_complete_tree =
             get_complete_tree_size(self.nb_items, BUCKET_SIZE) * BUCKET_SIZE;
 
-        let mut dummy_items = self
+        let dummy_items = self
             .generate_dummy_items(slots_complete_tree, ct_size)
             .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
 
         // Creating a new oram with potential prepended data.
-        let oram = Oram::new(&mut dummy_items, self.nb_items)?;
+        let oram = Oram::new(dummy_items, self.nb_items)?;
 
         Ok(oram)
     }
@@ -295,9 +299,8 @@ impl ClientOram {
         }
 
         // Read values from path located in ORAM.
-        let mut read_data = oram
-            .access(AccessType::Read, path, Option::None)?
-            .ok_or_else(|| {
+        let mut read_data =
+            oram.access(AccessType::Read, path)?.ok_or_else(|| {
                 Error::new(
                     ErrorKind::Interrupted,
                     format!("No value returned from read at path {}", path),
@@ -360,7 +363,7 @@ impl ClientOram {
         self.encrypt_stash()
             .map_err(|e| Error::new(ErrorKind::Interrupted, e.to_string()))?;
 
-        oram.access(AccessType::Write, path, Some(&mut ordered_elements))?;
+        oram.access(AccessType::Write(ordered_elements), path)?;
 
         Ok(())
     }
