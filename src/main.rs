@@ -1,7 +1,8 @@
 mod btree;
 mod client;
 mod oram;
-mod oram_tests;
+#[cfg(test)]
+mod tests;
 
 use crate::{btree::DataItem, client::ClientOram};
 use cosmian_crypto_core::{reexport::rand_core::SeedableRng, CsRng};
