@@ -47,6 +47,46 @@ Simply run `cargo build` followed by `cargo run`.
 
 The tests can be performed using `cargo test`.
 
+#### Userside
+Anyone intending to use this code should only worry about client/server(oram) creation, read/write operations and arbitrary changes on data between read and write. Such an example is given in `src/main.rs` and can be found below.
+
+```rs
+
+let nb_items: usize = 183;
+let ct_size: usize = 16;
+
+let mut client = ClientOram::new(nb_items);
+let mut csprng = CsRng::from_entropy();
+
+// Potential insertions of elements at the start:
+// - read will only gather dummies.
+// - write takes an optional argument of elements to insert.
+// They must also be inserted in the position map to query for them later.
+
+let mut oram = client.setup_oram(ct_size)?;
+
+let path = 22; // Arbitrary.
+let mut read_data = client.read_from_path(&mut oram, path)?;
+
+/* Changing the element at idx 6 in the values obtained. */
+/* ----------------------------------------------------- */
+let idx_data_item_to_change = 6;
+
+// First remove old element from position map.
+client.delete_element_from_position_map(&read_data[idx_data_item_to_change]);
+
+// Let's pretend the user changes the element.
+let data_changed = read_data[idx_data_item_to_change].data_as_mut();
+data_changed[0] = 255;
+
+// Insert back changed element into position map.
+client.insert_element_in_position_map(&read_data[idx_data_item_to_change]);
+
+// Writing elements back to the path without inserting anything new.
+client.write_to_path(&mut oram, &mut read_data, Option::None, path)?;
+```
+It should be stressed that **each read operation MUST be followed by a write operation on the same path**.
+
 ### Resources
 - Software Protection and Simulations on Oblivious-RAMs - Goldreich, Ostrovsky 1992.
 - Oblivious RAM with O((log N )^3) Worst-Case Cost - Shi et al. 2011.

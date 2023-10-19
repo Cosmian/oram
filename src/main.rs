@@ -13,7 +13,7 @@ fn main() -> Result<(), Error> {
     println!("Hello, Path-Oram!");
 
     /*
-     * Implementation from https://eprint.iacr.org/2013/280.
+     * Implementation of https://eprint.iacr.org/2013/280.
      *
      * Example of use for 183 items stored and a ciphertext size of 16 bytes.
      * This means that there will be ceil(183/4) = 46 nodes to hold those
